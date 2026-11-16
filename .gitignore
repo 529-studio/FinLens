@@ -47,5 +47,8 @@ models/
 rendered_pages_sample/
 benchmarks/data/rendered_pages_sample/
 
+# Testing & Tooling
+.playwright-mcp/
+
 # Office.js Add-in
 *.manifest.package

@@ -5,9 +5,8 @@
  * - Kiosk Ergonomics: >= 48px interactive target size
  */
 
-import React, { useState } from 'react';
+import { useState, type FormEvent, type FC } from 'react';
 import { useVisualRag } from '../../hooks/useVisualRag.hook';
-import { GroundedEvidenceDTO } from '../../types/visual_rag.types';
 import { 
   FileText, 
   Send, 
@@ -23,11 +22,11 @@ interface SplitViewProps {
   documentTitle: string;
 }
 
-export const SplitView: React.FC<SplitViewProps> = ({ documentId, documentTitle }) => {
+export const SplitView: FC<SplitViewProps> = ({ documentId, documentTitle }) => {
   const [inputText, setInputText] = useState('');
   const { state, error, history, activeEvidence, ask, focusEvidence, clearError } = useVisualRag(documentId);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
     if (!inputText.trim()) return;
     ask(inputText);

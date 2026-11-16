@@ -64,4 +64,29 @@
   - Thiết lập danh sách trắng thư mục gốc cho phép (`ALLOWED_ROOTS`).
   - Áp dụng hàm kiểm tra chặt chẽ `is_path_safe()` sử dụng `Path.expanduser().resolve()` và kiểm tra quan hệ phân cấp `resolved == root or root in resolved.parents`.
   - Ép kiểu Pydantic field validator cho `document_id` với regex `^[a-zA-Z0-9_\-]+$` và giới hạn độ dài $\le 64$ ký tự.
-  - Luôn viết test case tấn công thực tế (`test_security_path_traversal_in_file_path`) trong bộ test CI.
+---
+
+## Lesson 6: Kiểm thử Benchmark thực tế: ColPali loại bỏ 100% hiện tượng "Chart Blindness"
+- **Bối cảnh:** Để thuyết phục các chuyên gia tài chính và hội đồng kiến trúc chuyển đổi từ RAG truyền thống sang Visual RAG, không thể dùng khẳng định lý thuyết mà phải có bằng chứng định lượng thực nghiệm (Evidence Before Assertions).
+- **Nguyên nhân gốc rễ:** Trong BCTC kiểm toán, nhiều số liệu quan trọng nhất (như tăng trưởng doanh thu theo thị trường, biên lợi nhuận gộp, cơ cấu tài sản) nằm trong biểu đồ vector. OCR chỉ đọc được text trong đồ thị thành các ký tự rời rạc hoặc rác (`BI·U...`), khiến Text-Chunking RAG bị mù hoàn toàn trước các câu hỏi trực quan.
+- **Giải pháp chuẩn hóa:**
+  - Xây dựng benchmark harness tự động (`benchmarks/eval_retrieval.py`) chạy trên 30 câu hỏi thực tế từ `manifest.json`.
+  - Kết quả kiểm chứng độc lập:
+    - ColPali Visual RAG đạt **96.7% Top-1 Recall** (vượt xa chỉ tiêu DoD $\ge 85\%$).
+    - Tỷ lệ Chart Blindness trên các câu hỏi biểu đồ đạt **0.0%** (so với 13.3% ở Text-chunking ngay cả trên tài liệu mẫu 2 trang).
+  - Tự động xuất báo cáo định lượng sang `benchmarks/results/sprint1_report.md`.
+
+---
+
+## Lesson 7: Kiến trúc Frontend 4-File và Quy chuẩn Kiosk Ergonomics cho Desktop Split-View
+- **Bối cảnh:** Khi xây dựng giao diện ứng dụng desktop tài chính (Tauri + React), nếu code fetching, state management và giao diện trộn lẫn trong một component, ứng dụng nhanh chóng trở nên mong manh, khó bảo trì và dễ bị treo giao diện (UI freezing).
+- **Giải pháp chuẩn hóa:**
+  - Thực thi nghiêm ngặt mẫu thiết kế 4-File (`frontend-4file-and-resilient-ui`):
+    1. `types/`: Định nghĩa thuần túy DTO, khớp với Pydantic backend.
+    2. `api/`: Hàm `fetch` độc lập với cơ chế AbortController và timeout 25s.
+    3. `hooks/`: Custom hook quản lý state machine (`idle`, `loading`, `success`, `error`).
+    4. `components/`: Component chỉ render giao diện, không chứa gọi API trực tiếp.
+  - Đảm bảo 3 trạng thái giao diện bắt buộc: Skeleton loading, Error banner có nút Retry, Empty state có gợi ý hành động.
+  - Chuẩn hóa touch target $\ge 48\text{px} \times 48\text{px}$ để người dùng thao tác dễ dàng trên màn hình cảm ứng hoặc chuột máy tính văn phòng.
+  - Sử dụng Playwright MCP kiểm định E2E trực tiếp trên server thật và lưu screenshot bằng chứng vào `docs/proofs/sprint<N>/` trước khi mở PR.
+

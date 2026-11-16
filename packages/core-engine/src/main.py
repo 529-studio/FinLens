@@ -1,18 +1,19 @@
 """
 FinSight Core Engine Local Daemon
 Serves REST and WebSocket endpoints for Desktop App (Tauri v2) and Excel Add-in (Office.js).
-Governed by ADR-004.
+Governed by ADR-001, ADR-004, and AGENTS.md Rule 13 (Security & Injection Defense).
 """
 
+import re
 import time
 import os
 from pathlib import Path
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 
 # Enforce relative path for .env (529 standard)
-ENV_PATH = Path(__file__).resolve().parent.parent.parent.parent / ".env"
+ENV_PATH = Path(__file__).resolve().parents[3] / ".env"
 if ENV_PATH.exists():
     load_dotenv(dotenv_path=ENV_PATH)
 
@@ -25,6 +26,7 @@ from contracts import (
     BoundingBox,
 )
 from renderer import PdfRenderer
+from retriever import VisualRetriever
 from vlm_router import VlmRouter
 
 app = FastAPI(
@@ -43,6 +45,7 @@ app.add_middleware(
 )
 
 renderer = PdfRenderer()
+retriever = VisualRetriever()
 router = VlmRouter()
 
 
@@ -59,14 +62,20 @@ def health_check():
 @app.post("/api/v1/documents/ingest", response_model=DocumentIngestResponse)
 async def ingest_document(req: DocumentIngestRequest):
     start_time = time.time()
-    doc_id = req.document_id or Path(req.file_path).stem
+    raw_id = req.document_id or Path(req.file_path).stem
+    doc_id = re.sub(r"[^a-zA-Z0-9_\-]", "_", raw_id)[:64]
 
     try:
         pages = renderer.render_document(req.file_path, doc_id, dpi=req.render_dpi)
     except FileNotFoundError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Render error: {str(e)}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Render error: {str(e)}")
+
+    # Index into Visual Retriever
+    indexed_count = retriever.index_document(doc_id, pages)
 
     duration_ms = (time.time() - start_time) * 1000.0
 
@@ -74,7 +83,7 @@ async def ingest_document(req: DocumentIngestRequest):
         document_id=doc_id,
         total_pages=len(pages),
         rendered_image_paths=[str(p[1]) for p in pages],
-        indexed_vectors_count=len(pages),
+        indexed_vectors_count=indexed_count,
         duration_ms=round(duration_ms, 2),
     )
 
@@ -83,14 +92,15 @@ async def ingest_document(req: DocumentIngestRequest):
 async def query_financial_document(req: QueryRequest):
     start_time = time.time()
 
-    # Step 1: In production, ColPali retrievals candidate pages from LanceDB
-    top_page = 1  # Top retrieved page
+    # Step 1: Visual Late-Interaction candidate page retrieval
+    candidate_pages = retriever.search(req.document_id, req.query_text, top_k=req.top_k_pages)
+    primary_page = candidate_pages[0] if candidate_pages else 1
 
-    # Step 2: VLM analysis with visual grounding
-    dummy_img_path = f"~/.finsight/cache/rendered_pages/{req.document_id}/page_{top_page:04d}.png"
+    # Step 2: VLM visual grounding and reasoning
+    dummy_img_path = f"~/.finsight/cache/rendered_pages/{req.document_id}/page_{primary_page:04d}.png"
     vlm_result = await router.analyze_page(
         image_path=dummy_img_path,
-        page_number=top_page,
+        page_number=primary_page,
         query=req.query_text,
         preferred_mode=req.inference_mode,
     )
@@ -118,7 +128,7 @@ async def query_financial_document(req: QueryRequest):
         query_text=req.query_text,
         answer=vlm_result.get("answer", "Chưa có câu trả lời."),
         evidences=evidences,
-        retrieved_page_numbers=[top_page],
+        retrieved_page_numbers=candidate_pages,
         engine_used=vlm_result.get("engine", "unknown"),
         latency_ms=round(duration_ms, 2),
     )

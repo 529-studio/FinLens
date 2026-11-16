@@ -51,3 +51,17 @@
   - Triệt để thay thế `import fitz` bằng `import pymupdf`.
   - Viết bộ kiểm thử TDD (`packages/core-engine/tests/test_renderer.py`) xác thực kích thước pixel và định dạng PNG.
   - Sử dụng `repo_root = Path(__file__).resolve().parents[N]` thay vì tính tương đối theo CWD để tránh bẫy đường dẫn khi chạy pytest từ các thư mục con khác nhau.
+
+
+---
+
+## Lesson 5: Phòng thủ Path Traversal & Injection trong hệ thống RAG xử lý tài liệu cục bộ
+- **Bối cảnh:** Khi xây dựng backend cho Desktop RAG xử lý tài liệu PDF từ hệ thống tập tin người dùng, các endpoint nhận tham số `file_path` và `document_id` đối mặt với nguy cơ bị tấn công Path Traversal (`/etc/passwd`, `../../.ssh/id_rsa`, null-byte injections).
+- **Nguyên nhân gốc rễ:** 
+  1. Nếu chỉ dùng `os.path.exists()` hoặc `Path(p).is_file()`, kẻ tấn công có thể đọc trộm bất kỳ file nhạy cảm nào trên máy tính nạn nhân mà tiến trình backend có quyền đọc.
+  2. `document_id` nếu không được lọc ký tự đặc biệt có thể dùng để thoát khỏi thư mục cache vector DB (`doc/sub/../../evil`).
+- **Giải pháp chuẩn hóa (AGENTS.md Rule 13):**
+  - Thiết lập danh sách trắng thư mục gốc cho phép (`ALLOWED_ROOTS`).
+  - Áp dụng hàm kiểm tra chặt chẽ `is_path_safe()` sử dụng `Path.expanduser().resolve()` và kiểm tra quan hệ phân cấp `resolved == root or root in resolved.parents`.
+  - Ép kiểu Pydantic field validator cho `document_id` với regex `^[a-zA-Z0-9_\-]+$` và giới hạn độ dài $\le 64$ ký tự.
+  - Luôn viết test case tấn công thực tế (`test_security_path_traversal_in_file_path`) trong bộ test CI.

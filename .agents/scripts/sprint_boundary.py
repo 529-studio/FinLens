@@ -153,9 +153,11 @@ def on_pre_invocation(payload: dict) -> None:
 
 def main(argv: list[str]) -> int:
     mode = argv[1] if len(argv) > 1 else ""
+    payload = {}
     try:
-        raw = sys.stdin.read()
-        payload = json.loads(raw) if raw.strip() else {}
+        if not sys.stdin.isatty():
+            raw = sys.stdin.read()
+            payload = json.loads(raw) if raw.strip() else {}
     except Exception:
         payload = {}
 

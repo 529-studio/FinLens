@@ -36,7 +36,6 @@
   - Trên giao diện Split-View Desktop, mỗi con số trích xuất đều được gắn liên kết hai chiều với canvas SVG overlay của PDF Viewer.
   - Người dùng nhấp vào số liệu -> PDF Viewer tự động scroll và flash highlight vùng dữ liệu gốc, người dùng tự mắt thấy tai nghe bằng chứng (Evidence Before Assertions).
 
-
 ---
 
 ## Lesson 4: Hiện đại hóa PyMuPDF 2.x API và công thức chuẩn hóa DPI cho Visual Patch
@@ -52,7 +51,6 @@
   - Viết bộ kiểm thử TDD (`packages/core-engine/tests/test_renderer.py`) xác thực kích thước pixel và định dạng PNG.
   - Sử dụng `repo_root = Path(__file__).resolve().parents[N]` thay vì tính tương đối theo CWD để tránh bẫy đường dẫn khi chạy pytest từ các thư mục con khác nhau.
 
-
 ---
 
 ## Lesson 5: Phòng thủ Path Traversal & Injection trong hệ thống RAG xử lý tài liệu cục bộ
@@ -64,6 +62,7 @@
   - Thiết lập danh sách trắng thư mục gốc cho phép (`ALLOWED_ROOTS`).
   - Áp dụng hàm kiểm tra chặt chẽ `is_path_safe()` sử dụng `Path.expanduser().resolve()` và kiểm tra quan hệ phân cấp `resolved == root or root in resolved.parents`.
   - Ép kiểu Pydantic field validator cho `document_id` với regex `^[a-zA-Z0-9_\-]+$` và giới hạn độ dài $\le 64$ ký tự.
+
 ---
 
 ## Lesson 6: Kiểm thử Benchmark thực tế: ColPali loại bỏ 100% hiện tượng "Chart Blindness"
@@ -90,3 +89,30 @@
   - Chuẩn hóa touch target $\ge 48\text{px} \times 48\text{px}$ để người dùng thao tác dễ dàng trên màn hình cảm ứng hoặc chuột máy tính văn phòng.
   - Sử dụng Playwright MCP kiểm định E2E trực tiếp trên server thật và lưu screenshot bằng chứng vào `docs/proofs/sprint<N>/` trước khi mở PR.
 
+---
+
+## Lesson 8: Cơ chế Resizable Split-View với Pointer Capture và Phòng thủ Ca biên Tọa độ
+- **Bối cảnh:** Khi xây dựng thanh trượt phân chia màn hình (Split-View Divider) cho chuyên viên tài chính tùy biến tỷ lệ giữa văn bản PDF và bảng chat Copilot, việc dùng sự kiện mouse thông thường dễ bị tuột con trỏ khi kéo chuột nhanh ra ngoài mép màn hình, đồng thời gặp lỗi chia cho 0 khi container unmounted hoặc thu nhỏ tối đa.
+- **Giải pháp chuẩn hóa:**
+  - Sử dụng chuẩn `setPointerCapture(e.pointerId)` và `releasePointerCapture()` kết hợp listener fallback toàn cục `window.addEventListener('pointerup')` và `pointercancel`.
+  - Áp dụng kiểm tra bảo vệ `if (containerWidth <= 0) return;` trước mọi phép tính tỷ lệ để ngăn ngừa hoàn toàn lỗi `Infinity` hoặc `NaN` làm vỡ cú pháp `calc()`.
+  - Kẹp giới hạn cứng `minLeftWidth = 350px`, `minRightWidth = 350px` để không một bên nào bị sụp đổ (collapse) mất nội dung.
+  - Lưu trạng thái vào `localStorage` có bọc khối `try...catch` để an toàn trong môi trường Webview bị cấm lưu trữ cookie/storage.
+
+---
+
+## Lesson 9: Dynamic SVG Visual Grounding, Phòng thủ Va chạm Mép & Tầng Presentation Bất biến
+- **Bối cảnh:** Khi VLM trả về tọa độ Bounding Box `[ymin, xmin, ymax, xmax]` trên thang đo `[0, 1000]`, việc vẽ highlight lên PDF tài chính đối mặt với 2 rủi ro: làm biến dạng file PDF gốc nếu can thiệp vào tầng nhị phân, hoặc huy hiệu chú thích bị cắt cụt (clipped) khi hộp nằm sát mép đỉnh trang.
+- **Giải pháp chuẩn hóa:**
+  - Giữ tầng nhị phân PDF **100% bất biến (immutable)**; toàn bộ highlight được vẽ trên lớp trình diễn SVG vector độc lập với bộ lọc drop shadow `#EF4444` và hiệu ứng nhịp đập êm dịu 2.5s.
+  - Tự động phát hiện va chạm mép trên (`top < 28px`): tự động lật vị trí huy hiệu nguồn vào phía trong (`top-1 left-1`), bảo đảm nhãn số liệu và tỷ lệ tin cậy luôn đọc được trọn vẹn.
+  - Tự động kiểm tra và đảo ngược tọa độ nghịch (`ymin > ymax`) về chuẩn để tránh crash renderer đồ họa.
+
+---
+
+## Lesson 10: Quy chuẩn Zero-Emoji UI và Vector SVG Đồ họa Chuyên nghiệp trong FinTech
+- **Bối cảnh:** Việc sử dụng các emoji Unicode thô (📊, 📈, 🚀) trong giao diện phần mềm tài chính ngân hàng gây ra hiện tượng hiển thị lệch lạc, méo font chữ trên các hệ điều hành khác nhau (Windows 10/11 hiển thị hình khối phẳng, macOS hiển thị 3D màu, Linux hiển thị ô vuông lỗi), đồng thời làm giảm tính nghiêm túc của một công cụ phân tích kiểm toán.
+- **Giải pháp chuẩn hóa (AGENTS.md Rule 15):**
+  - Nghiêm cấm hoàn toàn raw Unicode emojis trên UI.
+  - Bắt buộc chuẩn hóa 100% bằng vector SVG có giấy phép tự do permissive (Lucide React / MIT).
+  - Tích hợp kiểm tra quét emoji tự động vào quy trình Post-Wave Audit (Rule 14) trước khi duyệt merge bất kỳ Pull Request nào.

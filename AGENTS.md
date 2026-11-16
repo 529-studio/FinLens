@@ -68,3 +68,25 @@ This project uses Lore for shared memory across all AI agents and sessions.
      5. Run `tools/sprint/close.sh` to validate the handoff and output the bootstrap prompt for the next conversation.
      6. Launch the new sprint in a FRESH conversation: `tools/sprint/close.sh --launch` (or `agy -i "<prompt>"`).
    - **Never start a new sprint's tasks in the closing conversation.**
+
+## 13. Independent Subagent Audit, Security/Injection & E2E Playwright Protocol
+
+Before any Pull Request is merged into `dev` or any bugfix is marked resolved, the following protocol MUST be executed:
+
+### A. Mandatory Independent Subagent Audit
+- The implementer agent MUST NOT audit its own PR.
+- An independent subagent (`research` or `self`) MUST be dispatched to review the diff against specifications, contracts, and security standards.
+- The PR description MUST include the Subagent Audit verdict and sign-off.
+
+### B. Backend Security & Injection Testing (Mandatory Live Checks)
+- **Path Traversal Defense:** All endpoints accepting file paths (e.g. `file_path`, `document_id`) must be actively probed for directory traversal (`../../etc/passwd`, arbitrary host reads). Only approved directories (`~/.finsight/`, `benchmarks/data/`, workspace) are permitted.
+- **Injection Defense:** All prompt inputs and query strings must be validated and sanitized. Zero `eval()`, zero unvalidated raw SQL execution, zero shell injection through subprocesses.
+- **Zero-Leak Leakage Defense:** Verify that no private keys, `.env` values, or API tokens leak into HTTP responses, debug logs, or vector metadata.
+
+### C. Frontend E2E Verification via Playwright MCP
+- For all frontend changes (`apps/desktop` or web views), the agent MUST launch the dev server and use **Playwright MCP tools** (`browser_navigate`, `browser_snapshot`, `browser_click`, `browser_console_messages`, `browser_take_screenshot`) to:
+  1. Inspect the live UI rendering.
+  2. Test interactive flows (e.g. drag & drop, clicking evidence chips, split-view resize).
+  3. Validate all 3 UI States (Skeleton loading, Error state with retry, Empty state).
+  4. Ensure 0 unhandled console errors and 0 failed network requests.
+  5. Save screenshot evidence to `docs/proofs/sprint<N>/` as empirical verification before merging PR.

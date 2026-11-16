@@ -35,3 +35,19 @@
   - Chuẩn hóa hệ quy chiếu tọa độ Bounding Box về thang đo chuẩn `[0, 1000]` cho `[ymin, xmin, ymax, xmax]`.
   - Trên giao diện Split-View Desktop, mỗi con số trích xuất đều được gắn liên kết hai chiều với canvas SVG overlay của PDF Viewer.
   - Người dùng nhấp vào số liệu -> PDF Viewer tự động scroll và flash highlight vùng dữ liệu gốc, người dùng tự mắt thấy tai nghe bằng chứng (Evidence Before Assertions).
+
+
+---
+
+## Lesson 4: Hiện đại hóa PyMuPDF 2.x API và công thức chuẩn hóa DPI cho Visual Patch
+- **Bối cảnh:** Khi sử dụng PyMuPDF trên Python 3.12 để render PDF tài chính sang ảnh, việc dùng API cũ `import fitz` sinh ra cảnh báo deprecation và có nguy cơ vỡ tương thích trong các bản phát hành tới. Đồng thời, cần công thức chính xác để chuyển đổi điểm tọa độ PDF (points) sang pixel ảnh ở độ phân giải 150 DPI và 200 DPI.
+- **Nguyên nhân gốc rễ:** 
+  1. Thư viện `pymupdf` phiên bản 2.x đã chuẩn hóa namespace sang `import pymupdf`.
+  2. PDF mặc định sử dụng hệ quy chiếu 72 points/inch. Khi render sang 150 DPI hoặc 200 DPI, ma trận biến đổi bắt buộc là:
+     `zoom = dpi / 72.0`
+     `mat = pymupdf.Matrix(zoom, zoom)`
+  3. Trên khổ giấy chuẩn A4 (595 x 842 pt), ảnh 150 DPI sẽ có kích thước chính xác là 1240 x 1755 px.
+- **Giải pháp chuẩn hóa:**
+  - Triệt để thay thế `import fitz` bằng `import pymupdf`.
+  - Viết bộ kiểm thử TDD (`packages/core-engine/tests/test_renderer.py`) xác thực kích thước pixel và định dạng PNG.
+  - Sử dụng `repo_root = Path(__file__).resolve().parents[N]` thay vì tính tương đối theo CWD để tránh bẫy đường dẫn khi chạy pytest từ các thư mục con khác nhau.

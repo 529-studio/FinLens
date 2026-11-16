@@ -76,7 +76,251 @@
   "evaluation_metrics": [
     "Top-1 Retrieval Recall",
     "Top-3 Retrieval Recall",
+    "Chart Blindness (Zero-data visual retrieval error rate)",
     "VLM Numerical Extraction Relative Error (%)",
-    "Bounding Box IoU (Intersection over Union)"
+    "Bounding Box IoU (Intersection over Union)",
+    "Average Query Latency (ms)"
+  ],
+  "benchmark_queries": [
+    {
+      "id": "Q01",
+      "category": "visual_chart",
+      "query": "Cơ cấu doanh thu theo thị trường xuất khẩu và nội địa năm 2023 qua biểu đồ là bao nhiêu?",
+      "target_document": "VNM_BCTC_2023_AUDITED",
+      "target_page": 1,
+      "requires_visual": true
+    },
+    {
+      "id": "Q02",
+      "category": "visual_chart",
+      "query": "Doanh thu thị trường nội địa đạt bao nhiêu nghìn tỷ theo biểu đồ cột?",
+      "target_document": "VNM_BCTC_2023_AUDITED",
+      "target_page": 1,
+      "requires_visual": true
+    },
+    {
+      "id": "Q03",
+      "category": "visual_chart",
+      "query": "Doanh thu xuất khẩu năm 2023 đạt bao nhiêu theo biểu đồ phân tích thị trường?",
+      "target_document": "VNM_BCTC_2023_AUDITED",
+      "target_page": 1,
+      "requires_visual": true
+    },
+    {
+      "id": "Q04",
+      "category": "visual_chart",
+      "query": "Biểu đồ so sánh doanh thu nội địa và xuất khẩu năm 2022 và 2023 nằm ở đâu?",
+      "target_document": "VNM_BCTC_2023_AUDITED",
+      "target_page": 1,
+      "requires_visual": true
+    },
+    {
+      "id": "Q05",
+      "category": "visual_chart",
+      "query": "Tỷ trọng doanh thu xuất khẩu so với tổng doanh thu năm 2023 theo biểu đồ tròn?",
+      "target_document": "VNM_BCTC_2023_AUDITED",
+      "target_page": 1,
+      "requires_visual": true
+    },
+    {
+      "id": "Q06",
+      "category": "visual_chart",
+      "query": "Biên lợi nhuận gộp và xu hướng tăng trưởng thể hiện qua biểu đồ kết quả kinh doanh?",
+      "target_document": "VNM_BCTC_2023_AUDITED",
+      "target_page": 1,
+      "requires_visual": true
+    },
+    {
+      "id": "Q07",
+      "category": "visual_chart",
+      "query": "Biểu đồ cột thị phần sữa chua và sữa tươi nội địa?",
+      "target_document": "VNM_BCTC_2023_AUDITED",
+      "target_page": 1,
+      "requires_visual": true
+    },
+    {
+      "id": "Q08",
+      "category": "visual_chart",
+      "query": "Tốc độ tăng trưởng doanh thu 0.7% YoY được biểu diễn ở đồ thị nào?",
+      "target_document": "VNM_BCTC_2023_AUDITED",
+      "target_page": 1,
+      "requires_visual": true
+    },
+    {
+      "id": "Q09",
+      "category": "visual_chart",
+      "query": "Biểu đồ cơ cấu sản phẩm sữa đặc và bột dinh dưỡng năm 2023?",
+      "target_document": "VNM_BCTC_2023_AUDITED",
+      "target_page": 1,
+      "requires_visual": true
+    },
+    {
+      "id": "Q10",
+      "category": "visual_chart",
+      "query": "Đồ thị cột phân bổ doanh thu kênh truyền thống và hiện đại?",
+      "target_document": "VNM_BCTC_2023_AUDITED",
+      "target_page": 1,
+      "requires_visual": true
+    },
+    {
+      "id": "Q11",
+      "category": "visual_chart",
+      "query": "Xu hướng lợi nhuận sau thuế tăng 5.2% YoY trên biểu đồ tổng quan?",
+      "target_document": "VNM_BCTC_2023_AUDITED",
+      "target_page": 1,
+      "requires_visual": true
+    },
+    {
+      "id": "Q12",
+      "category": "visual_chart",
+      "query": "Phân tích cơ cấu chi phí bán hàng và quản lý qua đồ thị thác nước (waterfall)?",
+      "target_document": "VNM_BCTC_2023_AUDITED",
+      "target_page": 1,
+      "requires_visual": true
+    },
+    {
+      "id": "Q13",
+      "category": "visual_chart",
+      "query": "Biểu đồ tỷ suất sinh lời ROE và ROA 3 năm gần nhất?",
+      "target_document": "VNM_BCTC_2023_AUDITED",
+      "target_page": 1,
+      "requires_visual": true
+    },
+    {
+      "id": "Q14",
+      "category": "visual_chart",
+      "query": "Đồ thị so sánh biến động chi phí nguyên vật liệu sữa bột thế giới?",
+      "target_document": "VNM_BCTC_2023_AUDITED",
+      "target_page": 1,
+      "requires_visual": true
+    },
+    {
+      "id": "Q15",
+      "category": "visual_chart",
+      "query": "Biểu đồ phân bố trang trại sinh thái và đàn bò sữa cả nước?",
+      "target_document": "VNM_BCTC_2023_AUDITED",
+      "target_page": 1,
+      "requires_visual": true
+    },
+    {
+      "id": "Q16",
+      "category": "financial_table",
+      "query": "Tổng tài sản ngắn hạn tại ngày 31/12/2023 trên bảng cân đối kế toán là bao nhiêu?",
+      "target_document": "VNM_BCTC_2023_AUDITED",
+      "target_page": 2,
+      "requires_visual": false
+    },
+    {
+      "id": "Q17",
+      "category": "financial_table",
+      "query": "Mã số 100 Tổng tài sản ngắn hạn đầu năm là bao nhiêu triệu đồng?",
+      "target_document": "VNM_BCTC_2023_AUDITED",
+      "target_page": 2,
+      "requires_visual": false
+    },
+    {
+      "id": "Q18",
+      "category": "financial_table",
+      "query": "Tiền và các khoản tương đương tiền Mã số 110 cuối năm 2023?",
+      "target_document": "VNM_BCTC_2023_AUDITED",
+      "target_page": 2,
+      "requires_visual": false
+    },
+    {
+      "id": "Q19",
+      "category": "financial_table",
+      "query": "Số dư tiền mặt Mã số 111 cuối năm 2023 là bao nhiêu?",
+      "target_document": "VNM_BCTC_2023_AUDITED",
+      "target_page": 2,
+      "requires_visual": false
+    },
+    {
+      "id": "Q20",
+      "category": "financial_table",
+      "query": "Các khoản tương đương tiền Mã số 112 cuối năm 2023 là bao nhiêu?",
+      "target_document": "VNM_BCTC_2023_AUDITED",
+      "target_page": 2,
+      "requires_visual": false
+    },
+    {
+      "id": "Q21",
+      "category": "financial_table",
+      "query": "Đầu tư tài chính ngắn hạn Mã số 120 cuối năm 2023 là bao nhiêu triệu đồng?",
+      "target_document": "VNM_BCTC_2023_AUDITED",
+      "target_page": 2,
+      "requires_visual": false
+    },
+    {
+      "id": "Q22",
+      "category": "financial_table",
+      "query": "Các khoản phải thu ngắn hạn Mã số 130 cuối năm 2023?",
+      "target_document": "VNM_BCTC_2023_AUDITED",
+      "target_page": 2,
+      "requires_visual": false
+    },
+    {
+      "id": "Q23",
+      "category": "financial_table",
+      "query": "Phải thu ngắn hạn của khách hàng Mã số 131 cuối năm 2023?",
+      "target_document": "VNM_BCTC_2023_AUDITED",
+      "target_page": 2,
+      "requires_visual": false
+    },
+    {
+      "id": "Q24",
+      "category": "financial_table",
+      "query": "Hàng tồn kho Mã số 140 cuối năm 2023 đạt bao nhiêu?",
+      "target_document": "VNM_BCTC_2023_AUDITED",
+      "target_page": 2,
+      "requires_visual": false
+    },
+    {
+      "id": "Q25",
+      "category": "financial_table",
+      "query": "Dự phòng giảm giá hàng tồn kho Mã số 149 là bao nhiêu?",
+      "target_document": "VNM_BCTC_2023_AUDITED",
+      "target_page": 2,
+      "requires_visual": false
+    },
+    {
+      "id": "Q26",
+      "category": "footnote_disclosure",
+      "query": "Thuyết minh số 4 về tiền và các khoản tương đương tiền nằm ở đâu?",
+      "target_document": "VNM_BCTC_2023_AUDITED",
+      "target_page": 2,
+      "requires_visual": false
+    },
+    {
+      "id": "Q27",
+      "category": "footnote_disclosure",
+      "query": "Thuyết minh số 5 về đầu tư tài chính ngắn hạn ghi nhận số liệu gì?",
+      "target_document": "VNM_BCTC_2023_AUDITED",
+      "target_page": 2,
+      "requires_visual": false
+    },
+    {
+      "id": "Q28",
+      "category": "footnote_disclosure",
+      "query": "Đơn vị kiểm toán độc lập đã ký xác nhận báo cáo tài chính là công ty nào?",
+      "target_document": "VNM_BCTC_2023_AUDITED",
+      "target_page": 1,
+      "requires_visual": false
+    },
+    {
+      "id": "Q29",
+      "category": "footnote_disclosure",
+      "query": "Chuẩn mực kế toán áp dụng cho báo cáo tài chính kiểm toán Vinamilk là gì?",
+      "target_document": "VNM_BCTC_2023_AUDITED",
+      "target_page": 1,
+      "requires_visual": false
+    },
+    {
+      "id": "Q30",
+      "category": "footnote_disclosure",
+      "query": "Thuyết minh về nguyên tắc ghi nhận ngoại tệ và dự phòng nợ xấu?",
+      "target_document": "VNM_BCTC_2023_AUDITED",
+      "target_page": 2,
+      "requires_visual": false
+    }
   ]
 }

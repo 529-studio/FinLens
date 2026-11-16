@@ -8,6 +8,7 @@
 import { useState, type FormEvent, type FC } from 'react';
 import { useVisualRag } from '../../hooks/useVisualRag.hook';
 import { ResizableSplitView } from './ResizableSplitView';
+import { BoundingBoxOverlay } from '../pdf/BoundingBoxOverlay';
 import { 
   FileText, 
   Send, 
@@ -73,21 +74,12 @@ export const SplitView: FC<SplitViewProps> = ({ documentId, documentTitle }) => 
           </div>
 
           {/* Visual Grounding Bounding Box Overlay */}
-          {activeEvidence && (
-            <div
-              style={{
-                top: `${(activeEvidence.bounding_box.ymin / 1000) * 700}px`,
-                left: `${(activeEvidence.bounding_box.xmin / 1000) * 500}px`,
-                width: `${((activeEvidence.bounding_box.xmax - activeEvidence.bounding_box.xmin) / 1000) * 500}px`,
-                height: `${((activeEvidence.bounding_box.ymax - activeEvidence.bounding_box.ymin) / 1000) * 700}px`,
-              }}
-              className="absolute border-2 border-red-500 bg-red-500/15 rounded animate-pulse pointer-events-none transition-all duration-300 shadow-[0_0_15px_rgba(239,68,68,0.5)]"
-            >
-              <span className="absolute -top-6 left-0 bg-red-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded shadow">
-                Source: {activeEvidence.label} ({Math.round(activeEvidence.confidence * 100)}%)
-              </span>
-            </div>
-          )}
+          <BoundingBoxOverlay
+            evidence={activeEvidence}
+            renderedWidth={500}
+            renderedHeight={700}
+            zoomLevel={1.0}
+          />
         </div>
       </div>
     </div>

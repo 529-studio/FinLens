@@ -90,3 +90,30 @@ Before any Pull Request is merged into `dev` or any bugfix is marked resolved, t
   3. Validate all 3 UI States (Skeleton loading, Error state with retry, Empty state).
   4. Ensure 0 unhandled console errors and 0 failed network requests.
   5. Save screenshot evidence to `docs/proofs/sprint<N>/` as empirical verification before merging PR.
+
+## 14. Post-Wave Independent Subagent Audit & UI/UX Quality Gate (Mandatory)
+
+Whenever a milestone wave (a batch or logical grouping of related tasks within a sprint) is completed, the agent MUST execute an independent verification cycle before proceeding to the next wave or closing the sprint:
+
+### A. Independent External Subagent Dispatch
+- The implementer agent MUST NOT perform its own wave audit.
+- An independent external subagent (`research` or `self` with role `Independent Codebase & UI/UX Quality Auditor`) MUST be dispatched.
+- The subagent must inspect the codebase, test suites, and live UI / proof artifacts.
+
+### B. Dual-Axis Audit Scope: Correctness & User-Friendliness
+The audit subagent MUST evaluate two mandatory dimensions:
+1. **Functional Correctness & Integration Health**:
+   - Inspect the codebase modified during the wave for contract consistency, type safety, regressions, and security defenses.
+   - Verify that all unit, component, and backend test suites pass with 100% success rate.
+   - Ensure zero orphaned code, zero `console.log` statements, and robust edge-case handling (e.g. division-by-zero, storage exceptions, invalid bounds).
+2. **UI/UX & User-Friendliness Inspection**:
+   - **Interactive Polish & Ergonomics**: Check that drag handles, split views, overlays, and animations operate smoothly without stutter or layout shifts.
+   - **Financial Analyst Usability**: Evaluate whether visual grounding highlights, confidence badges, and evidence chips are clear, readable, and intuitive for financial analysts reviewing audited filings.
+   - **3 UI States & Kiosk Standards**: Confirm that Skeleton loading, localized Error states with retry, and Actionable Empty states render gracefully, and interactive touch targets meet the $\ge 48\text{px}$ ergonomic rule.
+   - **Clarity & Contrast**: Verify dark/light contrast ratios, readable typography, and zero clipped labels or overflowing components.
+
+### C. Gate & Sign-Off Requirement
+- The subagent MUST generate a formal **Wave Audit Report** concluding with an explicit verdict:
+  - **VERDICT: APPROVED 🟢**: Wave meets all functional correctness standards and passes user-friendly UI/UX evaluation.
+  - **VERDICT: REJECTED 🔴**: Specific actionable issues or UX friction points are documented for the implementer to fix before proceeding.
+- The main agent MUST NOT advance to the next wave or initiate sprint close rituals until the independent audit report is signed off with `APPROVED`.

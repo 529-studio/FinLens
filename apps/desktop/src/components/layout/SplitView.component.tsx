@@ -16,7 +16,9 @@ import {
   AlertCircle, 
   Eye, 
   Sparkles,
-  ExternalLink 
+  ExternalLink,
+  ZoomIn,
+  ZoomOut
 } from 'lucide-react';
 
 interface SplitViewProps {
@@ -26,6 +28,7 @@ interface SplitViewProps {
 
 export const SplitView: FC<SplitViewProps> = ({ documentId, documentTitle }) => {
   const [inputText, setInputText] = useState('');
+  const [zoomLevel, setZoomLevel] = useState<number>(1.0);
   const { state, error, history, activeEvidence, ask, focusEvidence, clearError } = useVisualRag(documentId);
 
   const handleSubmit = (e: FormEvent) => {
@@ -35,25 +38,76 @@ export const SplitView: FC<SplitViewProps> = ({ documentId, documentTitle }) => 
     setInputText('');
   };
 
+  const handleZoomIn = () => setZoomLevel((z) => Math.min(1.8, Math.round((z + 0.1) * 10) / 10));
+  const handleZoomOut = () => setZoomLevel((z) => Math.max(0.6, Math.round((z - 0.1) * 10) / 10));
+  const handleZoomReset = () => setZoomLevel(1.0);
+
   const leftPaneContent = (
-    <div className="h-full flex flex-col relative bg-slate-900 border-r border-slate-800">
-      <header className="h-14 border-b border-slate-800 px-4 flex items-center justify-between">
-        <div className="flex items-center space-x-2">
-          <FileText className="w-5 h-5 text-indigo-400" />
-          <span className="font-semibold text-sm truncate max-w-xs">{documentTitle}</span>
+    <div className="h-full w-full flex flex-col relative bg-slate-900 border-r border-slate-800 overflow-hidden">
+      <header className="h-14 border-b border-slate-800 px-4 flex items-center justify-between gap-2 flex-shrink-0">
+        <div className="flex items-center space-x-2 min-w-0">
+          <FileText className="w-5 h-5 text-indigo-400 flex-shrink-0" />
+          <span className="font-semibold text-sm truncate max-w-[200px] 2xl:max-w-md">{documentTitle}</span>
         </div>
-        {activeEvidence && (
-          <div className="flex items-center space-x-2 bg-indigo-950/70 border border-indigo-700/50 px-2.5 py-1 rounded text-xs text-indigo-300">
-            <Eye className="w-3.5 h-3.5 text-indigo-400" />
-            <span>Trang {activeEvidence.page_number}: {activeEvidence.label}</span>
+
+        <div className="flex items-center space-x-3 flex-shrink-0">
+          {activeEvidence && (
+            <div className="hidden sm:flex items-center space-x-2 bg-indigo-950/70 border border-indigo-700/50 px-2.5 py-1 rounded text-xs text-indigo-300 truncate max-w-xs">
+              <Eye className="w-3.5 h-3.5 text-indigo-400 flex-shrink-0" />
+              <span className="truncate">Trang {activeEvidence.page_number}: {activeEvidence.label}</span>
+            </div>
+          )}
+
+          {/* Interactive Zoom Controls */}
+          <div className="flex items-center space-x-1 bg-slate-800/90 border border-slate-700 rounded-lg p-0.5 shadow-sm">
+            <button
+              type="button"
+              onClick={handleZoomOut}
+              className="p-1 hover:bg-slate-700 text-slate-300 rounded text-xs transition"
+              title="Thu nhỏ (Zoom Out)"
+              aria-label="Thu nhỏ"
+            >
+              <ZoomOut className="w-3.5 h-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={handleZoomReset}
+              className="px-1.5 py-0.5 hover:bg-slate-700 text-slate-300 rounded text-[11px] font-mono transition"
+              title="Đặt lại 100%"
+            >
+              {Math.round(zoomLevel * 100)}%
+            </button>
+            <button
+              type="button"
+              onClick={handleZoomIn}
+              className="p-1 hover:bg-slate-700 text-slate-300 rounded text-xs transition"
+              title="Phóng to (Zoom In)"
+              aria-label="Phóng to"
+            >
+              <ZoomIn className="w-3.5 h-3.5" />
+            </button>
           </div>
-        )}
+        </div>
       </header>
 
-      <div className="flex-1 relative overflow-auto p-6 flex justify-center items-center bg-slate-950/50">
-        {/* Simulated PDF Page Viewport */}
-        <div className="relative w-[500px] h-[700px] bg-white rounded shadow-2xl overflow-hidden border border-slate-700">
-          <div className="p-8 text-slate-900 text-xs space-y-4 select-none">
+      <div className="flex-1 relative overflow-auto p-6 flex justify-center items-start sm:items-center bg-slate-950/50">
+        {/* Simulated PDF Page Viewport with Scale Tracking */}
+        <div
+          style={{
+            width: `${500 * zoomLevel}px`,
+            height: `${700 * zoomLevel}px`,
+          }}
+          className="relative bg-white rounded shadow-2xl overflow-hidden border border-slate-700 transition-all duration-150 flex-shrink-0 my-auto"
+        >
+          <div
+            style={{
+              transform: `scale(${zoomLevel})`,
+              transformOrigin: 'top left',
+              width: '500px',
+              height: '700px',
+            }}
+            className="p-8 text-slate-900 text-xs space-y-4 select-none pointer-events-none"
+          >
             <h2 className="text-base font-bold text-center border-b pb-2">BÁO CÁO TÀI CHÍNH KIỂM TOÁN</h2>
             <div className="grid grid-cols-2 gap-4">
               <div className="h-32 bg-slate-100 rounded border border-dashed border-slate-300 flex items-center justify-center text-slate-400">
@@ -73,12 +127,12 @@ export const SplitView: FC<SplitViewProps> = ({ documentId, documentTitle }) => 
             </div>
           </div>
 
-          {/* Visual Grounding Bounding Box Overlay */}
+          {/* Visual Grounding Bounding Box Overlay with zoom scale */}
           <BoundingBoxOverlay
             evidence={activeEvidence}
             renderedWidth={500}
             renderedHeight={700}
-            zoomLevel={1.0}
+            zoomLevel={zoomLevel}
           />
         </div>
       </div>
@@ -86,8 +140,8 @@ export const SplitView: FC<SplitViewProps> = ({ documentId, documentTitle }) => 
   );
 
   const rightPaneContent = (
-    <div className="h-full flex flex-col bg-slate-900/60">
-      <header className="h-14 border-b border-slate-800 px-6 flex items-center justify-between">
+    <div className="h-full w-full flex flex-col bg-slate-900/60 overflow-hidden">
+      <header className="h-14 border-b border-slate-800 px-6 flex items-center justify-between flex-shrink-0">
         <div className="flex items-center space-x-2">
           <Sparkles className="w-5 h-5 text-indigo-400" />
           <h1 className="font-semibold text-sm">FinSight AI Copilot</h1>
@@ -111,7 +165,7 @@ export const SplitView: FC<SplitViewProps> = ({ documentId, documentTitle }) => 
                 Đặt câu hỏi về bất kỳ biểu đồ tăng trưởng, biên lợi nhuận, hoặc bảng số liệu phức tạp trong tài liệu.
               </p>
             </div>
-            <div className="flex flex-col gap-2 w-full max-w-xs pt-2">
+            <div className="flex flex-col gap-2 w-full max-w-sm pt-2">
               <button
                 onClick={() => ask('Biên lợi nhuận gộp qua biểu đồ các năm thay đổi như thế nào?')}
                 className="min-h-[48px] px-4 py-2 bg-slate-800 hover:bg-slate-700 text-xs rounded border border-slate-700 text-left transition"
@@ -132,13 +186,13 @@ export const SplitView: FC<SplitViewProps> = ({ documentId, documentTitle }) => 
         {history.map((msg, idx) => (
           <div key={idx} className="space-y-3">
             <div className="flex justify-end">
-              <div className="bg-indigo-600 text-white text-sm px-4 py-2.5 rounded-2xl rounded-tr-none max-w-lg shadow">
+              <div className="bg-indigo-600 text-white text-sm px-4 py-2.5 rounded-2xl rounded-tr-none max-w-xl 2xl:max-w-2xl shadow">
                 {msg.query_text}
               </div>
             </div>
 
             <div className="flex justify-start">
-              <div className="bg-slate-800/90 border border-slate-700 text-slate-200 text-sm p-4 rounded-2xl rounded-tl-none max-w-xl space-y-3 shadow-lg">
+              <div className="bg-slate-800/90 border border-slate-700 text-slate-200 text-sm p-4 rounded-2xl rounded-tl-none max-w-2xl 2xl:max-w-4xl space-y-3 shadow-lg">
                 <p className="leading-relaxed whitespace-pre-wrap">{msg.answer}</p>
 
                 {/* Audit Trail Evidence Chips */}
@@ -208,7 +262,7 @@ export const SplitView: FC<SplitViewProps> = ({ documentId, documentTitle }) => 
       </div>
 
       {/* Input Bar with Kiosk Touch Target */}
-      <form onSubmit={handleSubmit} className="p-4 border-t border-slate-800 flex items-center gap-2">
+      <form onSubmit={handleSubmit} className="p-4 border-t border-slate-800 flex items-center gap-2 flex-shrink-0">
         <input
           type="text"
           value={inputText}
@@ -228,7 +282,7 @@ export const SplitView: FC<SplitViewProps> = ({ documentId, documentTitle }) => 
   );
 
   return (
-    <div className="h-screen w-full bg-slate-950 text-slate-100 font-sans antialiased overflow-hidden">
+    <div className="h-full w-full bg-slate-950 text-slate-100 font-sans antialiased overflow-hidden flex flex-col">
       <ResizableSplitView
         leftPane={leftPaneContent}
         rightPane={rightPaneContent}

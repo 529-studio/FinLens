@@ -1,13 +1,14 @@
 """
 FinSight PDF Page Renderer Module
 Converts high-resolution PDF pages into normalized PNG images (150-200 DPI)
-for ColPali visual patch indexing and VLM input.
+for ColPali visual patch indexing and VLM visual grounding.
+Governed by ADR-001, Sprint 1 Issue #3, and 529 Engineering Standards.
 """
 
 import os
 from pathlib import Path
 from typing import List, Tuple
-import fitz  # PyMuPDF
+import pymupdf  # Modern PyMuPDF 2.x API
 
 
 class PdfRenderer:
@@ -27,23 +28,25 @@ class PdfRenderer:
         doc_dir = self.output_base_dir / document_id
         doc_dir.mkdir(parents=True, exist_ok=True)
 
-        doc = fitz.open(resolved_pdf)
-        results = []
+        doc = pymupdf.open(resolved_pdf)
+        results: List[Tuple[int, Path, int, int]] = []
 
-        # PyMuPDF default resolution is 72 DPI; zoom factor = target_dpi / 72
+        # Default PDF resolution is 72 DPI; zoom factor = target_dpi / 72.0
         zoom = dpi / 72.0
-        mat = fitz.Matrix(zoom, zoom)
+        mat = pymupdf.Matrix(zoom, zoom)
 
-        for page_idx in range(len(doc)):
-            page_num = page_idx + 1
-            page = doc.load_page(page_idx)
-            pix = page.get_pixmap(matrix=mat, alpha=False)
+        try:
+            for page_idx in range(len(doc)):
+                page_num = page_idx + 1
+                page = doc.load_page(page_idx)
+                pix = page.get_pixmap(matrix=mat, alpha=False)
 
-            image_filename = f"page_{page_num:04d}.png"
-            image_path = doc_dir / image_filename
-            pix.save(str(image_path))
+                image_filename = f"page_{page_num:04d}.png"
+                image_path = doc_dir / image_filename
+                pix.save(str(image_path))
 
-            results.append((page_num, image_path, pix.width, pix.height))
+                results.append((page_num, image_path, pix.width, pix.height))
+        finally:
+            doc.close()
 
-        doc.close()
         return results

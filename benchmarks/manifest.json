@@ -1,0 +1,82 @@
+{
+  "benchmark_suite": "FinSight Financial Visual RAG Benchmark v1.0",
+  "created_at": "2026-11-16",
+  "documents": [
+    {
+      "id": "VNM_BCTC_2023_AUDITED",
+      "company": "Vinamilk (VNM)",
+      "year": 2023,
+      "type": "Báo cáo tài chính kiểm toán hợp nhất",
+      "challenges": ["Biểu đồ tròn cơ cấu doanh thu xuất khẩu vs nội địa", "Thuyết minh chi phí bán hàng footnote 28"]
+    },
+    {
+      "id": "HPG_BCTC_2023_AUDITED",
+      "company": "Tập đoàn Hòa Phát (HPG)",
+      "year": 2023,
+      "type": "Báo cáo thường niên & BCTC kiểm toán",
+      "challenges": ["Biểu đồ thanh sản lượng thép và biên lợi nhuận EBITDA", "Bảng tài sản dở dang dài hạn dự án Dung Quất"]
+    },
+    {
+      "id": "VCB_BCTC_2023_AUDITED",
+      "company": "Vietcombank (VCB)",
+      "year": 2023,
+      "type": "BCTC kiểm toán ngân hàng chuẩn IFRS / VAS",
+      "challenges": ["Biểu đồ cơ cấu nợ nhóm 1 đến nhóm 5 (NPL)", "Bảng tính tỷ lệ an toàn vốn CAR"]
+    },
+    {
+      "id": "AAPL_10K_2023",
+      "company": "Apple Inc.",
+      "year": 2023,
+      "type": "US SEC Form 10-K",
+      "challenges": ["Segment Revenue by Product vs Services", "Warranty accrual footnotes"]
+    },
+    {
+      "id": "MSFT_10K_2023",
+      "company": "Microsoft Corporation",
+      "year": 2023,
+      "type": "US SEC Form 10-K",
+      "challenges": ["Intelligent Cloud vs Productivity revenue waterfall", "Lease liabilities schedule"]
+    },
+    {
+      "id": "FPT_BCTC_2023_AUDITED",
+      "company": "Tập đoàn FPT",
+      "year": 2023,
+      "type": "Báo cáo tài chính kiểm toán",
+      "challenges": ["Doanh thu chuyển đổi số toàn cầu", "Biểu đồ nhân sự công nghệ"]
+    },
+    {
+      "id": "MWG_BCTC_2023_AUDITED",
+      "company": "Thế Giới Di Động (MWG)",
+      "year": 2023,
+      "type": "Báo cáo kiểm toán hợp nhất",
+      "challenges": ["Điểm hòa vốn chuỗi Bách Hóa Xanh", "Chi phí tái cấu trúc đóng cửa cửa hàng"]
+    },
+    {
+      "id": "NVL_BCTC_2023_AUDITED",
+      "company": "Tập đoàn Novaland",
+      "year": 2023,
+      "type": "Báo cáo tài chính soát xét",
+      "challenges": ["Thuyết minh nghĩa vụ trái phiếu đáo hạn và tái cấu trúc nợ"]
+    },
+    {
+      "id": "TSLA_10K_2023",
+      "company": "Tesla Inc.",
+      "year": 2023,
+      "type": "US SEC Form 10-K",
+      "challenges": ["Automotive gross margin excluding regulatory credits chart", "Energy storage deployment"]
+    },
+    {
+      "id": "GAS_BCTC_2023_AUDITED",
+      "company": "PV GAS",
+      "year": 2023,
+      "type": "BCTC kiểm toán",
+      "challenges": ["Biến động giá dầu Brent và biên lợi nhuận khí LNG"]
+    }
+  ],
+  "evaluation_metrics": [
+    "Top-1 Retrieval Recall",
+    "Top-3 Retrieval Recall",
+    "VLM Numerical Extraction Relative Error (%)",
+    "Bounding Box IoU (Intersection over Union)"
+  ]
+}

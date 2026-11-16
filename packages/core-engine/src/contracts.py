@@ -1,10 +1,37 @@
 """
-FinSight Data Contracts & Type Specifications
-Governed by ADR-003 and 529 Studio Engineering Standards.
+FinSight Data Contracts & Security Validation
+Governed by ADR-003, AGENTS.md Rule 13, and 529 Engineering Standards.
+Enforces strict input validation, path traversal defense, and bounding box constraints.
 """
 
+import re
+from pathlib import Path
 from typing import List, Optional, Tuple, Literal
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+
+ALLOWED_ROOTS = [
+    Path("~/.finsight").expanduser().resolve(),
+    Path(__file__).resolve().parents[3] / "benchmarks",
+    Path(__file__).resolve().parents[3] / "data",
+    Path("/tmp/finsight_test").resolve(),
+]
+
+
+def is_path_safe(raw_path: str) -> bool:
+    """Verifies that a filesystem path does not escape authorized boundaries."""
+    try:
+        resolved = Path(raw_path).expanduser().resolve()
+        # Ensure no null bytes
+        if "\0" in str(raw_path):
+            return False
+        # Check against approved root directories
+        return any(
+            resolved == root or root in resolved.parents
+            for root in ALLOWED_ROOTS
+        )
+    except Exception:
+        return False
 
 
 class BoundingBox(BaseModel):
@@ -17,6 +44,22 @@ class BoundingBox(BaseModel):
     ymax: int = Field(..., ge=0, le=1000, description="Bottom boundary coordinate (0-1000)")
     xmax: int = Field(..., ge=0, le=1000, description="Right boundary coordinate (0-1000)")
 
+    @field_validator("ymax")
+    @classmethod
+    def validate_vertical(cls, ymax: int, info):
+        ymin = info.data.get("ymin", 0)
+        if ymax <= ymin:
+            raise ValueError(f"ymax ({ymax}) must be strictly greater than ymin ({ymin})")
+        return ymax
+
+    @field_validator("xmax")
+    @classmethod
+    def validate_horizontal(cls, xmax: int, info):
+        xmin = info.data.get("xmin", 0)
+        if xmax <= xmin:
+            raise ValueError(f"xmax ({xmax}) must be strictly greater than xmin ({xmin})")
+        return xmax
+
     def as_tuple(self) -> Tuple[int, int, int, int]:
         return (self.ymin, self.xmin, self.ymax, self.xmax)
 
@@ -28,16 +71,33 @@ class GroundedEvidence(BaseModel):
     """
     page_number: int = Field(..., ge=1, description="1-indexed source PDF page number")
     bounding_box: BoundingBox = Field(..., description="Visual bounding box highlighting source evidence")
-    label: str = Field(..., description="Human-readable label (e.g. 'Revenue Chart 2023', 'Balance Sheet Note 4')")
-    extracted_value: Optional[str] = Field(None, description="Exact numerical value or text extracted")
-    confidence: float = Field(..., ge=0.0, le=1.0, description="Confidence score of the visual grounding")
+    label: str = Field(..., min_length=2, max_length=150, description="Human-readable label")
+    extracted_value: Optional[str] = Field(None, max_length=100, description="Exact numerical value or text extracted")
+    confidence: float = Field(..., ge=0.0, le=1.0, description="Confidence score of visual grounding")
 
 
 class DocumentIngestRequest(BaseModel):
     """Request payload to render and index a financial PDF."""
-    file_path: str = Field(..., description="Absolute path to the source PDF on local filesystem")
-    document_id: Optional[str] = Field(None, description="Optional custom document identifier")
+    file_path: str = Field(..., description="Path to source PDF on filesystem")
+    document_id: Optional[str] = Field(None, description="Alphanumeric document identifier")
     render_dpi: int = Field(150, ge=72, le=300, description="Target DPI for PNG rendering")
+
+    @field_validator("document_id")
+    @classmethod
+    def sanitize_doc_id(cls, v: Optional[str]):
+        if v is not None:
+            if not re.match(r"^[a-zA-Z0-9_\-]+$", v):
+                raise ValueError("document_id must be strictly alphanumeric (letters, digits, _, -)")
+            if len(v) > 64:
+                raise ValueError("document_id must not exceed 64 characters")
+        return v
+
+    @field_validator("file_path")
+    @classmethod
+    def validate_traversal(cls, v: str):
+        if not is_path_safe(v):
+            raise ValueError("Access denied: file_path must reside within authorized project/storage boundaries")
+        return v
 
 
 class DocumentIngestResponse(BaseModel):
@@ -51,10 +111,26 @@ class DocumentIngestResponse(BaseModel):
 
 class QueryRequest(BaseModel):
     """User query payload."""
-    document_id: str
-    query_text: str = Field(..., min_length=2, description="Financial analyst question")
+    document_id: str = Field(..., description="Document identifier")
+    query_text: str = Field(..., min_length=2, max_length=1000, description="Financial analyst question")
     top_k_pages: int = Field(2, ge=1, le=5, description="Number of candidate pages to retrieve")
     inference_mode: Literal["auto", "local", "cloud"] = Field("auto", description="Dual-mode inference strategy")
+
+    @field_validator("document_id")
+    @classmethod
+    def sanitize_doc_id(cls, v: str):
+        if not re.match(r"^[a-zA-Z0-9_\-]+$", v):
+            raise ValueError("document_id must be strictly alphanumeric (letters, digits, _, -)")
+        return v
+
+    @field_validator("query_text")
+    @classmethod
+    def sanitize_query(cls, v: str):
+        # Prevent prompt injection markers and control characters
+        cleaned = v.replace("\0", "").strip()
+        if not cleaned:
+            raise ValueError("query_text cannot be empty after trimming")
+        return cleaned
 
 
 class QueryResponse(BaseModel):

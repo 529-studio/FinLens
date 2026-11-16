@@ -34,7 +34,7 @@ help: ## Show this help menu with descriptions
 ##@ 🚀 Local Development
 
 .PHONY: dev
-dev: ## Run both backend Core Engine and Desktop Frontend concurrently
+dev: kill ## Run both backend Core Engine and Desktop Frontend concurrently
 	@echo -e "$(GREEN)Starting FinSight Full-Stack Environment...$(RESET)"
 	@echo -e "$(YELLOW)Engine: http://127.0.0.1:8765$(RESET) | $(YELLOW)Desktop UI: http://localhost:5173$(RESET)"
 	@trap 'kill 0' SIGINT SIGTERM EXIT; \

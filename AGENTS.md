@@ -117,3 +117,12 @@ The audit subagent MUST evaluate two mandatory dimensions:
   - **VERDICT: APPROVED 🟢**: Wave meets all functional correctness standards and passes user-friendly UI/UX evaluation.
   - **VERDICT: REJECTED 🔴**: Specific actionable issues or UX friction points are documented for the implementer to fix before proceeding.
 - The main agent MUST NOT advance to the next wave or initiate sprint close rituals until the independent audit report is signed off with `APPROVED`.
+
+## 15. Zero-Emoji UI Policy & Free-Licensed SVG Iconography (Mandatory)
+
+To ensure enterprise-grade visual polish, cross-platform consistency, and professional financial ergonomics:
+- **Zero Raw Emojis in UI**: NEVER use raw Unicode emojis (e.g. 📊, 📈, 🚀, 🟢, 🔴, ⚠️, ❌, 💡) in user interfaces, buttons, badges, headers, or any user-facing presentation layers. Emojis render inconsistently across operating systems (macOS, Windows 10/11, Linux, embedded webviews), appear amateurish, and distort professional typography.
+- **Strict Free-Licensed SVG Mandate**: All iconography MUST use vector SVG icons under verified permissive free licenses (e.g. MIT, Apache 2.0, ISC, or CC0):
+  - Primary UI icon set: **Lucide React** (ISC/MIT license) or clean inline SVGs.
+  - Sizing & Alignment: Icons must be sized appropriately (e.g. `w-4 h-4`, `w-5 h-5`), styled with accessible contrast colors (e.g. `text-indigo-400`, `text-emerald-400`), and aligned via flexbox (`flex items-center space-x-2`).
+- **Enforcement**: Subagent audits under Rule 13 and Rule 14 MUST verify 0 raw emojis in frontend source files before issuing sign-off.

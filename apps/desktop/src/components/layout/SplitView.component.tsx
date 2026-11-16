@@ -18,7 +18,9 @@ import {
   Sparkles,
   ExternalLink,
   ZoomIn,
-  ZoomOut
+  ZoomOut,
+  BarChart3,
+  PieChart
 } from 'lucide-react';
 
 interface SplitViewProps {
@@ -168,15 +170,17 @@ export const SplitView: FC<SplitViewProps> = ({ documentId, documentTitle }) => 
             <div className="flex flex-col gap-2 w-full max-w-sm pt-2">
               <button
                 onClick={() => ask('Biên lợi nhuận gộp qua biểu đồ các năm thay đổi như thế nào?')}
-                className="min-h-[48px] px-4 py-2 bg-slate-800 hover:bg-slate-700 text-xs rounded border border-slate-700 text-left transition"
+                className="min-h-[48px] px-4 py-2 bg-slate-800 hover:bg-slate-700 text-xs rounded border border-slate-700 text-left transition flex items-center space-x-2.5"
               >
-                📊 Phân tích biên lợi nhuận gộp qua biểu đồ
+                <BarChart3 className="w-4 h-4 text-indigo-400 flex-shrink-0" />
+                <span>Phân tích biên lợi nhuận gộp qua biểu đồ</span>
               </button>
               <button
                 onClick={() => ask('Cơ cấu doanh thu theo mảng kinh doanh năm 2023?')}
-                className="min-h-[48px] px-4 py-2 bg-slate-800 hover:bg-slate-700 text-xs rounded border border-slate-700 text-left transition"
+                className="min-h-[48px] px-4 py-2 bg-slate-800 hover:bg-slate-700 text-xs rounded border border-slate-700 text-left transition flex items-center space-x-2.5"
               >
-                📈 Cơ cấu doanh thu theo từng mảng
+                <PieChart className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                <span>Cơ cấu doanh thu theo từng mảng</span>
               </button>
             </div>
           </div>

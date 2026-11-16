@@ -39,3 +39,32 @@ This project uses Lore for shared memory across all AI agents and sessions.
 - **Definition of Done**: When introducing or modifying environment variables, API endpoints, module dependencies, or architectural rules, invoke `memory_write` with evidence.
 - **Provenance & drift**: Use `memory_blame` to verify authority, author, and evidence before overwriting an established pattern.
 <!-- lore:memory-protocol:end -->
+
+## 12. Git Flow, Protected Branches, and Sprint Boundary Protocol
+
+### A. Git Flow & Protected Branch Policy
+1. **Default Branch is `dev`:**
+   - All active development merges into `dev`.
+   - `main` represents production releases tagged per milestone.
+2. **Branch Protection:**
+   - Both `dev` and `main` are protected. Direct pushes are strictly forbidden.
+   - All modifications MUST go through a Pull Request targeting `dev`.
+   - **Merge Commit Required:** PR merges MUST create a merge commit (`gh pr merge --merge`). Squash and rebase merges are disabled to preserve granular Git history and verifiable attribution.
+3. **Branch Naming Standard:**
+   - Features: `feat/s<N>-<task-slug>` (e.g. `feat/s1-pdf-renderer`)
+   - Fixes: `fix/<issue-number>-<slug>`
+   - Handoff & Sprint Close: `docs/s<N>-handoff`
+
+### B. Sprint Boundary Protocol (1 Conversation = 1 Sprint)
+1. **Context Window Hygiene:**
+   - A single agent conversation covers exactly **one sprint** (or roughly ~1,200 conversation steps).
+   - Bloated conversations (>1,200 steps) suffer from context degradation, forgotten constraints, and hallucinated diffs.
+2. **Sprint Close Ritual:**
+   - When all tasks of a sprint are implemented and verified via PRs into `dev`:
+     1. Author `docs/reports/sprint<N>_report.md` documenting verified quantitative scorecards and reality checks.
+     2. Run `tools/sprint/close.sh --init` to scaffold `docs/HANDOFF-s<N>.md` (must be between 700 B and 12 KB, with all 7 numbered sections completed).
+     3. Ensure all lessons learned are recorded in `docs/lesson_learn.md` and synced via `npm run harvest:lessons`.
+     4. Open a PR for `docs/s<N>-handoff` and merge it into `dev` with a merge commit.
+     5. Run `tools/sprint/close.sh` to validate the handoff and output the bootstrap prompt for the next conversation.
+     6. Launch the new sprint in a FRESH conversation: `tools/sprint/close.sh --launch` (or `agy -i "<prompt>"`).
+   - **Never start a new sprint's tasks in the closing conversation.**

@@ -13,6 +13,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 from mlx_engine import MLXEngine
+from cloud_router import CloudRouter
 
 # Enforce relative path for .env (529 standard: env-and-auth-ops-debugging)
 ENV_PATH = Path(__file__).resolve().parents[3] / ".env"
@@ -23,11 +24,10 @@ logger = logging.getLogger("finsight.vlm_router")
 
 
 class VlmRouter:
-    def __init__(self, mlx_engine: MLXEngine = None):
+    def __init__(self, mlx_engine: MLXEngine = None, cloud_router: CloudRouter = None):
         self.default_mode = os.getenv("FINSIGHT_INFERENCE_MODE", "auto")
-        self.anthropic_api_key = os.getenv("ANTHROPIC_API_KEY", "")
-        self.openai_api_key = os.getenv("OPENAI_API_KEY", "")
         self.mlx_engine = mlx_engine or MLXEngine()
+        self.cloud_router = cloud_router or CloudRouter()
 
     def detect_hardware_capability(self) -> str:
         """Detects whether local Apple Silicon or CUDA is available."""
@@ -63,16 +63,7 @@ class VlmRouter:
 
     async def _infer_cloud_litellm(self, image_path: str, page_number: int, query: str) -> Dict[str, Any]:
         """Cloud LiteLLM adapter (Claude 3.5 Sonnet / Azure OpenAI)."""
-        evidences = self._generate_visual_grounding(page_number, query)
-        engine_name = "claude-3-5-sonnet-cloud"
-
-        answer = self._synthesize_financial_answer(page_number, query, engine_name)
-
-        return {
-            "engine": engine_name,
-            "answer": answer,
-            "evidences": evidences,
-        }
+        return await self.cloud_router.analyze_page(image_path, page_number, query)
 
     def _generate_visual_grounding(self, page_number: int, query: str) -> List[Dict[str, Any]]:
         """

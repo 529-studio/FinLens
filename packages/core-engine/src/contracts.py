@@ -7,7 +7,7 @@ Enforces strict input validation, path traversal defense, and bounding box const
 import re
 import tempfile
 from pathlib import Path
-from typing import List, Optional, Tuple, Literal
+from typing import List, Optional, Tuple, Literal, Dict, Any
 from pydantic import BaseModel, Field, field_validator
 
 
@@ -186,5 +186,34 @@ class DocumentListResponse(BaseModel):
     """List of indexed documents in persistent storage."""
     documents: List[str]
     total: int
+
+
+class CloudProviderDetail(BaseModel):
+    """Status details for a cloud frontier model provider (Zero-Leak: no keys)."""
+    configured: bool
+    model: str
+    api_base_configured: Optional[bool] = None
+
+
+class CloudStatusResponse(BaseModel):
+    """Status response for Cloud BYOK router (Rule 2: Zero-Leak)."""
+    available_providers: List[str]
+    providers: Dict[str, CloudProviderDetail]
+    default_model: str
+
+
+class CloudKeyUpdateRequest(BaseModel):
+    """Request payload to update cloud BYOK API key in session."""
+    provider: Literal["anthropic", "azure", "openai"]
+    api_key: str = Field(..., min_length=1, description="BYOK API key (never returned in responses)")
+    api_base: Optional[str] = Field(None, description="Optional custom base URL or Azure endpoint")
+
+
+class CloudKeyUpdateResponse(BaseModel):
+    """Zero-Leak response confirming API key update without exposing credentials."""
+    provider: str
+    status: str
+    message: str
+
 
 

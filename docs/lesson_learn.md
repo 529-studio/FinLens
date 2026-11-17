@@ -131,3 +131,17 @@
   - Kiểm tra trần bộ nhớ định kỳ bằng `mx.get_active_memory()` và `psutil`, chủ động ngắt hoặc cảnh báo khi vượt trần 6.0GB (`MemoryCeilingExceededError`).
   - Cung cấp cơ chế hồi quy ngoại tuyến (Offline Resilient Fallback) để toàn bộ pipeline API kiểm toán và CI/CD có thể kiểm thử xác thực ngay cả khi chưa tải trọng số 4.5GB.
 
+---
+
+## Lesson 12: LanceDB Persistent Multi-Vector Store, Cú pháp SQL Filter & Idempotent Upsert
+- **Bối cảnh:** Khi chuyển đổi từ bộ nhớ RAM tạm thời (`_registry` dictionary) sang lưu trữ vector lâu dài trên đĩa (`~/.finsight/lancedb`), hệ thống lưu trữ vector phải hỗ trợ đa vector (multi-vector patch embeddings), bền vững qua các lần khởi động lại tiến trình và bảo vệ tuyệt đối tính toàn vẹn dữ liệu.
+- **Nguyên nhân & Rủi ro:**
+  1. Trong LanceDB SQL filter, việc bọc chuỗi giá trị bằng dấu nháy kép (`where('doc_id = "test"')`) khiến LanceDB hiểu lầm `test` là tên cột (identifier) thay vì giá trị chuỗi, gây ra lỗi `ValueError: Invalid input, Schema error: No field named test`. Bắt buộc phải sử dụng dấu nháy đơn (`where("doc_id = 'test'")`).
+  2. Deprecation API: `table_names()` bị deprecate trong LanceDB 0.41+, thay bằng `list_tables()`.
+  3. Khi nạp lại (re-ingest) cùng một tài liệu, nếu chỉ `add()` thì sẽ sinh ra các bản ghi trùng lặp (duplicate rows), làm sai lệch kết quả vector search.
+- **Giải pháp chuẩn hóa:**
+  - Thực thi cơ chế Upsert Idempotent: trước khi thêm các bản ghi trang mới, chủ động xóa các bản ghi cũ của `doc_id` bằng `tbl.delete(f"doc_id = '{clean_id}'")`.
+  - Chuẩn hóa tên định danh `_sanitize_doc_id` ngăn chặn hoàn toàn SQL injection và path traversal.
+  - Cung cấp API quản lý vòng đời tài liệu (`GET /api/v1/store/stats`, `GET /api/v1/documents`, `DELETE /api/v1/documents/{doc_id}`).
+
+

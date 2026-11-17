@@ -1,0 +1,41 @@
+name: FinSight CI
+on:
+  push:
+    branches: [dev, main]
+  pull_request:
+    branches: [dev, main]
+
+jobs:
+  test-core:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+      - name: Install Dependencies
+        run: |
+          cd packages/core-engine
+          python -m venv .venv
+          source .venv/bin/activate
+          pip install -r requirements.txt
+      - name: Run Core Tests
+        run: |
+          source packages/core-engine/.venv/bin/activate
+          PYTHONPATH=packages/core-engine/src pytest packages/core-engine/tests -v
+
+  test-desktop:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install Dependencies
+        run: |
+          npm install
+          npm install --prefix apps/desktop
+      - name: Run Desktop Tests
+        run: npm --prefix apps/desktop test

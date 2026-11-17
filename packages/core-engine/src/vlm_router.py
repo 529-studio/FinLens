@@ -12,6 +12,8 @@ from typing import Dict, Any, List
 from pathlib import Path
 from dotenv import load_dotenv
 
+from mlx_engine import MLXEngine
+
 # Enforce relative path for .env (529 standard: env-and-auth-ops-debugging)
 ENV_PATH = Path(__file__).resolve().parents[3] / ".env"
 if ENV_PATH.exists():
@@ -21,10 +23,11 @@ logger = logging.getLogger("finsight.vlm_router")
 
 
 class VlmRouter:
-    def __init__(self):
+    def __init__(self, mlx_engine: MLXEngine = None):
         self.default_mode = os.getenv("FINSIGHT_INFERENCE_MODE", "auto")
         self.anthropic_api_key = os.getenv("ANTHROPIC_API_KEY", "")
         self.openai_api_key = os.getenv("OPENAI_API_KEY", "")
+        self.mlx_engine = mlx_engine or MLXEngine()
 
     def detect_hardware_capability(self) -> str:
         """Detects whether local Apple Silicon or CUDA is available."""
@@ -56,16 +59,7 @@ class VlmRouter:
 
     async def _infer_local_mlx(self, image_path: str, page_number: int, query: str) -> Dict[str, Any]:
         """Local MLX inference with normalized coordinates (0-1000 scale)."""
-        evidences = self._generate_visual_grounding(page_number, query)
-        engine_name = "mlx-qwen2.5-vl-7b-4bit"
-
-        answer = self._synthesize_financial_answer(page_number, query, engine_name)
-
-        return {
-            "engine": engine_name,
-            "answer": answer,
-            "evidences": evidences,
-        }
+        return self.mlx_engine.analyze_page(image_path, page_number, query)
 
     async def _infer_cloud_litellm(self, image_path: str, page_number: int, query: str) -> Dict[str, Any]:
         """Cloud LiteLLM adapter (Claude 3.5 Sonnet / Azure OpenAI)."""

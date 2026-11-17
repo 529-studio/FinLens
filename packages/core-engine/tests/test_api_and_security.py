@@ -7,6 +7,7 @@ Governed by AGENTS.md Rule 13.
 
 import pytest
 from pathlib import Path
+from unittest.mock import patch
 from fastapi.testclient import TestClient
 
 import sys
@@ -138,3 +139,43 @@ def test_security_bounding_box_invariants():
 
     with pytest.raises(ValueError):
         BoundingBox(ymin=100, xmin=100, ymax=200, xmax=1050)
+
+
+# ==============================================================================
+# S3-01: MLX LOCAL ENGINE & MODEL MANAGEMENT TESTS
+# ==============================================================================
+
+def test_mlx_model_status_endpoint():
+    res = client.get("/api/v1/models/mlx/status")
+    assert res.status_code == 200
+    data = res.json()
+    assert "model_id" in data
+    assert "mlx-community/Qwen2.5-VL-7B-Instruct-4bit" in data["model_id"]
+    assert "is_cached" in data
+    assert "memory_usage" in data
+    assert "hardware_capability" in data
+    assert data["memory_ceiling_gb"] == 6.0
+
+
+def test_mlx_model_download_unconfirmed_rejected():
+    # Attempting to download without confirm=True must be rejected with 400 Bad Request
+    res = client.post("/api/v1/models/mlx/download", json={
+        "model_id": "mlx-community/Qwen2.5-VL-7B-Instruct-4bit",
+        "confirm": False,
+    })
+    assert res.status_code == 400
+    assert "confirmation" in res.json()["detail"].lower()
+
+
+def test_mlx_model_download_confirmed():
+    with patch("main.model_manager.download_model") as mock_dl:
+        mock_dl.return_value = Path("/tmp/mock_mlx_model")
+        res = client.post("/api/v1/models/mlx/download", json={
+            "model_id": "mlx-community/Qwen2.5-VL-7B-Instruct-4bit",
+            "confirm": True,
+        })
+        assert res.status_code == 200
+        data = res.json()
+        assert data["status"] in ("downloaded", "cached")
+        assert "model_id" in data
+

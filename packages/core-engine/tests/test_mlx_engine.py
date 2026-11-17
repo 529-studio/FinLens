@@ -124,12 +124,12 @@ def test_parse_vlm_output_coordinate_clamping(mock_model_manager):
     assert evidences[0]["xmax"] > evidences[0]["xmin"]
 
 
-def test_analyze_page_fallback_when_model_not_loaded(mock_model_manager, tmp_path):
+def test_analyze_page_fallback_when_model_not_loaded(mock_model_manager):
     engine = MLXEngine(model_manager=mock_model_manager)
-    # Create safe dummy image
-    bench_dir = Path(__file__).resolve().parents[3] / "benchmarks"
-    bench_dir.mkdir(parents=True, exist_ok=True)
-    dummy_img = bench_dir / "test_page_1.png"
+    # Create safe dummy image in allowed tmp dir
+    safe_dir = Path("/tmp/finsight_test")
+    safe_dir.mkdir(parents=True, exist_ok=True)
+    dummy_img = safe_dir / "test_page_1.png"
     dummy_img.write_text("fake image content")
 
     res = engine.analyze_page(
@@ -146,7 +146,7 @@ def test_analyze_page_fallback_when_model_not_loaded(mock_model_manager, tmp_pat
 
 
 @patch("mlx_engine.mlx_vlm")
-def test_analyze_page_live_generation(mock_vlm, mock_model_manager, tmp_path):
+def test_analyze_page_live_generation(mock_vlm, mock_model_manager):
     engine = MLXEngine(model_manager=mock_model_manager)
     engine._model = MagicMock()
     engine._processor = MagicMock()
@@ -158,9 +158,9 @@ def test_analyze_page_live_generation(mock_vlm, mock_model_manager, tmp_path):
     ```
     """
 
-    bench_dir = Path(__file__).resolve().parents[3] / "benchmarks"
-    bench_dir.mkdir(parents=True, exist_ok=True)
-    dummy_img = bench_dir / "test_page_live.png"
+    safe_dir = Path("/tmp/finsight_test")
+    safe_dir.mkdir(parents=True, exist_ok=True)
+    dummy_img = safe_dir / "test_page_live.png"
     dummy_img.write_text("fake image content")
 
     res = engine.analyze_page(

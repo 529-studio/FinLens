@@ -142,3 +142,31 @@ class QueryResponse(BaseModel):
     retrieved_page_numbers: List[int]
     engine_used: str = Field(..., description="e.g. 'mlx-qwen2.5-vl-7b-4bit' or 'claude-3-5-sonnet'")
     latency_ms: float
+
+
+class ModelStatusResponse(BaseModel):
+    """Status payload for local Apple Silicon MLX VLM engine."""
+    model_id: str
+    quantization: str
+    estimated_size_gb: float
+    memory_ceiling_gb: float
+    is_cached: bool
+    is_loaded: bool
+    cache_dir: str
+    hardware_capability: str
+    memory_usage: dict
+
+
+class ModelDownloadRequest(BaseModel):
+    """Request payload to initiate model weight download."""
+    model_id: Optional[str] = None
+    confirm: bool = Field(False, description="Explicit user confirmation required before download")
+
+
+class ModelDownloadResponse(BaseModel):
+    """Response payload for model download operation."""
+    model_id: str
+    status: str
+    cache_dir: str
+    message: str
+

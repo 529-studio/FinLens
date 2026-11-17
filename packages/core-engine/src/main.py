@@ -24,10 +24,21 @@ from contracts import (
     QueryResponse,
     GroundedEvidence,
     BoundingBox,
+    ModelStatusResponse,
+    ModelDownloadRequest,
+    ModelDownloadResponse,
 )
 from renderer import PdfRenderer
 from retriever import VisualRetriever
 from vlm_router import VlmRouter
+from model_manager import (
+    ModelManager,
+    DEFAULT_MODEL_ID,
+    UnconfirmedDownloadError,
+    ModelSecurityError,
+    ModelOfflineError,
+)
+from mlx_engine import MLXEngine
 
 app = FastAPI(
     title="FinSight Visual Financial RAG Daemon",
@@ -46,7 +57,9 @@ app.add_middleware(
 
 renderer = PdfRenderer()
 retriever = VisualRetriever()
-router = VlmRouter()
+model_manager = ModelManager()
+mlx_engine = MLXEngine(model_manager=model_manager)
+router = VlmRouter(mlx_engine=mlx_engine)
 
 
 @app.get("/health")
@@ -57,6 +70,51 @@ def health_check():
         "hardware_detected": router.detect_hardware_capability(),
         "timestamp": time.time(),
     }
+
+
+@app.get("/api/v1/models/mlx/status", response_model=ModelStatusResponse)
+def get_mlx_model_status():
+    """Returns local Apple Silicon MLX model status, caching state, and memory metrics."""
+    info = model_manager.get_model_info(mlx_engine.model_id)
+    mem = mlx_engine.get_memory_usage()
+    hw = router.detect_hardware_capability()
+    return ModelStatusResponse(
+        model_id=info["model_id"],
+        quantization=info["quantization"],
+        estimated_size_gb=info["estimated_size_gb"],
+        memory_ceiling_gb=info["memory_ceiling_gb"],
+        is_cached=info["is_cached"],
+        is_loaded=mlx_engine.is_loaded,
+        cache_dir=info["cache_dir"],
+        hardware_capability=hw,
+        memory_usage=mem,
+    )
+
+
+@app.post("/api/v1/models/mlx/download", response_model=ModelDownloadResponse)
+def download_mlx_model(req: ModelDownloadRequest):
+    """
+    Downloads MLX model weights into local cache.
+    Requires explicit user confirmation (confirm=True) to prevent surprise downloads.
+    """
+    mid = req.model_id or mlx_engine.model_id
+    try:
+        target_path = model_manager.download_model(mid, confirmed=req.confirm)
+        return ModelDownloadResponse(
+            model_id=mid,
+            status="cached" if model_manager.is_cached(mid) else "downloaded",
+            cache_dir=str(target_path),
+            message=f"Model '{mid}' is ready in local cache.",
+        )
+    except UnconfirmedDownloadError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except (ModelSecurityError, ValueError) as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except ModelOfflineError as e:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Download error: {str(e)}")
+
 
 
 @app.post("/api/v1/documents/ingest", response_model=DocumentIngestResponse)

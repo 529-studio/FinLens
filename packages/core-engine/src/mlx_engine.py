@@ -83,10 +83,17 @@ class MLXEngine:
         metal_active_bytes = 0
         metal_peak_bytes = 0
 
-        if metal is not None and hasattr(metal, "get_active_memory"):
+        # Heed deprecation: use mx.get_active_memory() over mx.metal.get_active_memory()
+        if mx is not None and hasattr(mx, "get_active_memory"):
+            try:
+                metal_active_bytes = mx.get_active_memory()
+                metal_peak_bytes = mx.get_peak_memory() if hasattr(mx, "get_peak_memory") else 0
+            except Exception as e:
+                logger.debug("Failed to read mlx memory: %s", e)
+        elif metal is not None and hasattr(metal, "get_active_memory"):
             try:
                 metal_active_bytes = metal.get_active_memory()
-                metal_peak_bytes = metal.get_peak_memory()
+                metal_peak_bytes = metal.get_peak_memory() if hasattr(metal, "get_peak_memory") else 0
             except Exception as e:
                 logger.debug("Failed to read metal memory: %s", e)
 

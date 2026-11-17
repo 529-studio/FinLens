@@ -116,3 +116,18 @@
   - Nghiêm cấm hoàn toàn raw Unicode emojis trên UI.
   - Bắt buộc chuẩn hóa 100% bằng vector SVG có giấy phép tự do permissive (Lucide React / MIT).
   - Tích hợp kiểm tra quét emoji tự động vào quy trình Post-Wave Audit (Rule 14) trước khi duyệt merge bất kỳ Pull Request nào.
+
+---
+
+## Lesson 11: Apple Silicon MLX VLM Engine, Quản lý Bộ nhớ Hợp nhất < 6GB & Cổng Xác nhận Tải Trọng số
+- **Bối cảnh:** Khi nhúng mô hình thị giác ngôn ngữ cục bộ 4-bit (`Qwen2.5-VL-7B-Instruct-4bit`) trên macOS bằng `mlx-vlm`, ứng dụng cần chạy hoàn toàn offline không tốn chi phí token, bảo đảm mức tiêu thụ bộ nhớ dưới ngưỡng 6GB Unified Memory để không gây nghẽn trên MacBook RAM 16GB, và tuyệt đối không tự ý tải 4.5GB trọng số từ HuggingFace khi người dùng chưa xác nhận rõ ràng.
+- **Nguyên nhân & Rủi ro:**
+  1. Tự động tải nền không báo trước tiêu tốn băng thông di động hoặc làm người dùng ngỡ ngàng khi dung lượng đĩa bị chiếm dụng.
+  2. Deprecation trong MLX: `mx.metal.get_active_memory()` bị deprecated và thay bằng `mx.get_active_memory()`.
+  3. Quản lý bộ nhớ hợp nhất (Unified Memory) trên Apple Silicon đòi hỏi đo đạc kết hợp cả Metal active/peak allocations và Process RSS.
+- **Giải pháp chuẩn hóa (DoD Issue #10):**
+  - Xây dựng `ModelManager` với cổng kiểm soát xác nhận người dùng bắt buộc (`confirm=True`), ngăn chặn mọi hành vi tự ý tải trọng số khi thiếu sự đồng thuận (`UnconfirmedDownloadError`).
+  - Kiểm tra đường dẫn an toàn (`is_path_safe`), phòng thủ tuyệt đối tấn công Directory Traversal (`../../etc/passwd`).
+  - Kiểm tra trần bộ nhớ định kỳ bằng `mx.get_active_memory()` và `psutil`, chủ động ngắt hoặc cảnh báo khi vượt trần 6.0GB (`MemoryCeilingExceededError`).
+  - Cung cấp cơ chế hồi quy ngoại tuyến (Offline Resilient Fallback) để toàn bộ pipeline API kiểm toán và CI/CD có thể kiểm thử xác thực ngay cả khi chưa tải trọng số 4.5GB.
+

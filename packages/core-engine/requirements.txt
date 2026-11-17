@@ -11,3 +11,7 @@ litellm>=1.52.0
 python-dotenv>=1.0.1
 httpx>=0.27.0
 pytest>=8.3.0
+huggingface-hub>=0.24.0
+mlx>=0.20.0
+mlx-vlm>=0.1.0
+

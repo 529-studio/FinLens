@@ -133,15 +133,17 @@
 
 ---
 
-## Lesson 12: LanceDB Persistent Multi-Vector Store, Cú pháp SQL Filter & Idempotent Upsert
-- **Bối cảnh:** Khi chuyển đổi từ bộ nhớ RAM tạm thời (`_registry` dictionary) sang lưu trữ vector lâu dài trên đĩa (`~/.finsight/lancedb`), hệ thống lưu trữ vector phải hỗ trợ đa vector (multi-vector patch embeddings), bền vững qua các lần khởi động lại tiến trình và bảo vệ tuyệt đối tính toàn vẹn dữ liệu.
-- **Nguyên nhân & Rủi ro:**
-  1. Trong LanceDB SQL filter, việc bọc chuỗi giá trị bằng dấu nháy kép (`where('doc_id = "test"')`) khiến LanceDB hiểu lầm `test` là tên cột (identifier) thay vì giá trị chuỗi, gây ra lỗi `ValueError: Invalid input, Schema error: No field named test`. Bắt buộc phải sử dụng dấu nháy đơn (`where("doc_id = 'test'")`).
-  2. Deprecation API: `table_names()` bị deprecate trong LanceDB 0.41+, thay bằng `list_tables()`.
-  3. Khi nạp lại (re-ingest) cùng một tài liệu, nếu chỉ `add()` thì sẽ sinh ra các bản ghi trùng lặp (duplicate rows), làm sai lệch kết quả vector search.
+## Lesson 13: Cloud BYOK Router qua LiteLLM, Quản lý Khóa Zero-Leak & Định tuyến Multi-Modal
+- **Bối cảnh:** Đối với người dùng máy tính văn phòng thông thường không sở hữu GPU/NPU mạnh mẽ, FinSight cần cung cấp khả năng suy luận đám mây với cơ chế BYOK (Bring Your Own Key) cho Anthropic Claude 3.5 Sonnet, Azure OpenAI và OpenAI GPT-4o mà không vi phạm chính sách bảo mật Zero-Leak (AGENTS.md Rule 2).
+- **Nguyên nhân & Cạm bẫy:**
+  1. Xung đột phụ thuộc: Cài đặt gói `litellm` trần có xu hướng tự động hạ cấp `huggingface-hub` xuống `<2.0`, làm vỡ thư viện `mlx-vlm`. Khắc phục bằng cách ghim phiên bản phụ thuộc `pip install "huggingface-hub>=2.0" litellm`.
+  2. Rò rỉ thông tin đăng nhập: Nếu các endpoint trả lời trạng thái cấu hình phản hồi một phần tiền tố khóa (e.g. `sk-ant-api03...`) hoặc trả lại khóa trong JSON response / stack trace, kẻ tấn công hoặc mã độc cục bộ có thể đánh cắp API key của doanh nghiệp.
+  3. Mã hóa hình ảnh và Path Traversal: Việc đọc file ảnh để mã hóa base64 đưa vào prompt thị giác (Vision API) nếu không kiểm tra đường dẫn sẽ trở thành công cụ đọc trộm file nhạy cảm trên máy nạn nhân.
 - **Giải pháp chuẩn hóa:**
-  - Thực thi cơ chế Upsert Idempotent: trước khi thêm các bản ghi trang mới, chủ động xóa các bản ghi cũ của `doc_id` bằng `tbl.delete(f"doc_id = '{clean_id}'")`.
-  - Chuẩn hóa tên định danh `_sanitize_doc_id` ngăn chặn hoàn toàn SQL injection và path traversal.
-  - Cung cấp API quản lý vòng đời tài liệu (`GET /api/v1/store/stats`, `GET /api/v1/documents`, `DELETE /api/v1/documents/{doc_id}`).
+  - Thiết kế `CloudRouter` bọc qua LiteLLM hỗ trợ định tuyến linh hoạt: Anthropic, OpenAI và Azure OpenAI.
+  - Tuân thủ nghiêm ngặt Chính sách Zero-Leak: API keys chỉ lưu trong session bộ nhớ hoặc nạp từ `.env`, các endpoint API (`GET /api/v1/models/cloud/status`, `POST /api/v1/models/cloud/keys`) chỉ trả về cờ boolean `configured: true/false` và tuyệt đối không bao giờ phản hồi giá trị khóa.
+  - Bảo vệ đa tầng: Kiểm tra an toàn đường dẫn (`is_path_safe`) trước khi đọc và mã hóa base64; chuẩn hóa và gọt phẳng tọa độ bounding box VLM về thang đo `[0, 1000]`.
+  - Hồi quy ngoại tuyến (Offline Resilient Fallback): Nếu chưa cấu hình API key hoặc mạng ngoại tuyến, hệ thống tự động fallback về câu trả lời giả định có cấu trúc chuẩn để không làm gián đoạn trải nghiệm người dùng hoặc test suite.
+
 
 

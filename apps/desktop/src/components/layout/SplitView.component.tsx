@@ -7,8 +7,10 @@
 
 import { useState, type FormEvent, type FC } from 'react';
 import { useVisualRag } from '../../hooks/useVisualRag.hook';
+import { useSettings } from '../../hooks/useSettings.hook';
 import { ResizableSplitView } from './ResizableSplitView';
 import { BoundingBoxOverlay } from '../pdf/BoundingBoxOverlay';
+import { SettingsDialog } from '../settings/SettingsDialog';
 import { 
   FileText, 
   Send, 
@@ -20,7 +22,8 @@ import {
   ZoomIn,
   ZoomOut,
   BarChart3,
-  PieChart
+  PieChart,
+  Settings
 } from 'lucide-react';
 
 interface SplitViewProps {
@@ -31,12 +34,14 @@ interface SplitViewProps {
 export const SplitView: FC<SplitViewProps> = ({ documentId, documentTitle }) => {
   const [inputText, setInputText] = useState('');
   const [zoomLevel, setZoomLevel] = useState<number>(1.0);
+  const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
   const { state, error, history, activeEvidence, ask, focusEvidence, clearError } = useVisualRag(documentId);
+  const { inferenceMode } = useSettings();
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
     if (!inputText.trim()) return;
-    ask(inputText);
+    ask(inputText, inferenceMode);
     setInputText('');
   };
 
@@ -148,9 +153,20 @@ export const SplitView: FC<SplitViewProps> = ({ documentId, documentTitle }) => 
           <Sparkles className="w-5 h-5 text-indigo-400" />
           <h1 className="font-semibold text-sm">FinSight AI Copilot</h1>
         </div>
-        <span className="text-xs text-slate-400 bg-slate-800 px-2.5 py-1 rounded-full border border-slate-700">
-          Visual RAG Native
-        </span>
+        <div className="flex items-center space-x-2">
+          <button
+            type="button"
+            onClick={() => setIsSettingsOpen(true)}
+            className="p-2 hover:bg-slate-800 text-slate-400 hover:text-slate-200 rounded-lg transition"
+            title="Cài đặt hệ thống & BYOK"
+            aria-label="Cài đặt hệ thống"
+          >
+            <Settings className="w-4 h-4" />
+          </button>
+          <span className="text-xs text-slate-400 bg-slate-800 px-2.5 py-1 rounded-full border border-slate-700">
+            {inferenceMode === 'local' ? 'MLX Local' : inferenceMode === 'cloud' ? 'Cloud BYOK' : 'Auto'}
+          </span>
+        </div>
       </header>
 
       {/* Message Thread Area with 3 UI States */}
@@ -293,6 +309,10 @@ export const SplitView: FC<SplitViewProps> = ({ documentId, documentTitle }) => 
         minLeftWidth={350}
         minRightWidth={350}
         initialRatio={0.5}
+      />
+      <SettingsDialog
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
       />
     </div>
   );

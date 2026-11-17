@@ -29,10 +29,15 @@ from contracts import (
     ModelDownloadResponse,
     StoreStatsResponse,
     DocumentListResponse,
+    CloudStatusResponse,
+    CloudProviderDetail,
+    CloudKeyUpdateRequest,
+    CloudKeyUpdateResponse,
 )
 from renderer import PdfRenderer
 from retriever import VisualRetriever
 from vlm_router import VlmRouter
+from cloud_router import CloudRouter
 from store import StoreSecurityError
 from model_manager import (
     ModelManager,
@@ -62,7 +67,8 @@ renderer = PdfRenderer()
 retriever = VisualRetriever()
 model_manager = ModelManager()
 mlx_engine = MLXEngine(model_manager=model_manager)
-router = VlmRouter(mlx_engine=mlx_engine)
+cloud_router = CloudRouter()
+router = VlmRouter(mlx_engine=mlx_engine, cloud_router=cloud_router)
 
 
 @app.get("/health")
@@ -117,6 +123,39 @@ def download_mlx_model(req: ModelDownloadRequest):
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Download error: {str(e)}")
+
+
+@app.get("/api/v1/models/cloud/status", response_model=CloudStatusResponse)
+def get_cloud_model_status():
+    """Returns available and configured cloud providers (Rule 2: Zero-Leak)."""
+    status_dict = cloud_router.get_provider_status()
+    providers_detail = {
+        p: CloudProviderDetail(
+            configured=info["configured"],
+            model=info["model"],
+            api_base_configured=info.get("api_base_configured"),
+        )
+        for p, info in status_dict.items()
+    }
+    return CloudStatusResponse(
+        available_providers=list(cloud_router.PROVIDER_MODELS.keys()),
+        providers=providers_detail,
+        default_model="claude-3-5-sonnet-20241022",
+    )
+
+
+@app.post("/api/v1/models/cloud/keys", response_model=CloudKeyUpdateResponse)
+def update_cloud_key(req: CloudKeyUpdateRequest):
+    """Updates cloud BYOK API key in memory session (Rule 2: Zero-Leak)."""
+    try:
+        cloud_router.set_api_key(req.provider, req.api_key, api_base=req.api_base)
+        return CloudKeyUpdateResponse(
+            provider=req.provider,
+            status="configured",
+            message=f"API key for provider '{req.provider}' successfully updated in session.",
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 
 @app.get("/api/v1/store/stats", response_model=StoreStatsResponse)

@@ -68,7 +68,7 @@ class CloudRouter:
         self.azure_base = _clean_env(os.getenv("AZURE_API_BASE", ""))
         self.azure_version = _clean_env(os.getenv("AZURE_API_VERSION", "2024-02-15-preview"))
 
-    def set_api_key(self, provider: str, key: str) -> None:
+    def set_api_key(self, provider: str, key: str, api_base: Optional[str] = None) -> None:
         """Sets or updates an API key in the session securely."""
         clean = _clean_env(key)
         p = provider.lower()
@@ -78,6 +78,8 @@ class CloudRouter:
             self.openai_key = clean
         elif p == "azure":
             self.azure_key = clean
+            if api_base is not None:
+                self.azure_base = _clean_env(api_base)
         else:
             raise ValueError(f"Unsupported provider: {provider}")
 

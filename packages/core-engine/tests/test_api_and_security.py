@@ -227,3 +227,70 @@ def test_document_delete_security_traversal_rejected():
     assert res.status_code in (400, 404, 422)
 
 
+# ==============================================================================
+# S3-02: CLOUD BYOK ROUTER ENDPOINTS & ZERO-LEAK TESTS
+# ==============================================================================
+
+def test_cloud_status_endpoint():
+    res = client.get("/api/v1/models/cloud/status")
+    assert res.status_code == 200
+    data = res.json()
+    assert "available_providers" in data
+    assert "anthropic" in data["available_providers"]
+    assert "azure" in data["available_providers"]
+    assert "openai" in data["available_providers"]
+    assert "providers" in data
+    assert "anthropic" in data["providers"]
+    assert "configured" in data["providers"]["anthropic"]
+    assert "model" in data["providers"]["anthropic"]
+
+
+def test_cloud_key_update_endpoint_zero_leak():
+    secret_key = "sk-ant-api03-TOP_SECRET_FINSIGHT_TEST_KEY_9999"
+    res = client.post("/api/v1/models/cloud/keys", json={
+        "provider": "anthropic",
+        "api_key": secret_key,
+    })
+    assert res.status_code == 200
+    res_text = res.text
+    # Zero-Leak Rule 2: Secret key must NEVER appear in response body
+    assert secret_key not in res_text
+    data = res.json()
+    assert data["provider"] == "anthropic"
+    assert data["status"] == "configured"
+
+    # Status must now reflect configured=True without leaking the key
+    status_res = client.get("/api/v1/models/cloud/status")
+    assert status_res.status_code == 200
+    assert secret_key not in status_res.text
+    status_data = status_res.json()
+    assert status_data["providers"]["anthropic"]["configured"] is True
+
+
+def test_cloud_key_update_invalid_provider_rejected():
+    res = client.post("/api/v1/models/cloud/keys", json={
+        "provider": "unsupported_provider",
+        "api_key": "some-key",
+    })
+    # Literal validation should fail with 422
+    assert res.status_code == 422
+
+
+def test_query_with_cloud_inference_mode():
+    query_payload = {
+        "document_id": "VNM_2023_TEST_FLOW",
+        "query_text": "Cơ cấu doanh thu theo biểu đồ thị trường năm 2023 thay đổi ra sao?",
+        "top_k_pages": 1,
+        "inference_mode": "cloud",
+    }
+    res = client.post("/api/v1/query", json=query_payload)
+    assert res.status_code == 200
+    data = res.json()
+    assert "cloud" in data["engine_used"].lower()
+    assert len(data["evidences"]) >= 1
+    bbox = data["evidences"][0]["bounding_box"]
+    assert 0 <= bbox["ymin"] < bbox["ymax"] <= 1000
+    assert 0 <= bbox["xmin"] < bbox["xmax"] <= 1000
+
+
+

@@ -92,9 +92,9 @@ export const SettingsDialog: FC<SettingsDialogProps> = ({ isOpen, onClose }) => 
             type="button"
             onClick={onClose}
             aria-label="Đóng cửa sổ cài đặt"
-            className="w-10 h-10 rounded-xl hover:bg-slate-800 text-slate-400 hover:text-slate-200 flex items-center justify-center transition"
+            className="w-12 h-12 rounded-xl hover:bg-slate-800 text-slate-400 hover:text-slate-200 flex items-center justify-center transition"
           >
-            <X className="w-5 h-5" />
+            <X className="w-6 h-6" />
           </button>
         </header>
 

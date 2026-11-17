@@ -10,6 +10,7 @@ import { useVisualRag } from '../../hooks/useVisualRag.hook';
 import { useSettings } from '../../hooks/useSettings.hook';
 import { ResizableSplitView } from './ResizableSplitView';
 import { BoundingBoxOverlay } from '../pdf/BoundingBoxOverlay';
+import { PdfViewer } from '../pdf/PdfViewer';
 import { SettingsDialog } from '../settings/SettingsDialog';
 import { 
   FileText, 
@@ -99,41 +100,12 @@ export const SplitView: FC<SplitViewProps> = ({ documentId, documentTitle }) => 
 
       <div className="flex-1 relative overflow-auto p-6 flex justify-center items-start sm:items-center bg-slate-950/50">
         {/* Simulated PDF Page Viewport with Scale Tracking */}
-        <div
-          style={{
-            width: `${500 * zoomLevel}px`,
-            height: `${700 * zoomLevel}px`,
-          }}
-          className="relative bg-white rounded shadow-2xl overflow-hidden border border-slate-700 transition-all duration-150 flex-shrink-0 my-auto"
-        >
-          <div
-            style={{
-              transform: `scale(${zoomLevel})`,
-              transformOrigin: 'top left',
-              width: '500px',
-              height: '700px',
-            }}
-            className="p-8 text-slate-900 text-xs space-y-4 select-none pointer-events-none"
-          >
-            <h2 className="text-base font-bold text-center border-b pb-2">BÁO CÁO TÀI CHÍNH KIỂM TOÁN</h2>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="h-32 bg-slate-100 rounded border border-dashed border-slate-300 flex items-center justify-center text-slate-400">
-                [Biểu đồ Cơ Cấu Doanh Thu]
-              </div>
-              <div className="h-32 bg-slate-100 rounded border border-dashed border-slate-300 flex items-center justify-center text-slate-400">
-                [Biểu đồ Biên Lợi Nhuận YoY]
-              </div>
-            </div>
-            <div className="h-48 bg-slate-50 border border-slate-200 rounded p-2">
-              <p className="font-semibold">Bảng Cân Đối Kế Toán (Trích yếu)</p>
-              <div className="mt-2 space-y-1">
-                <div className="flex justify-between border-b pb-1"><span>Tài sản ngắn hạn</span><span>142.500 tỷ</span></div>
-                <div className="flex justify-between border-b pb-1"><span>Tiền & tương đương tiền</span><span>28.120 tỷ</span></div>
-                <div className="flex justify-between"><span>Đầu tư tài chính</span><span>45.000 tỷ</span></div>
-              </div>
-            </div>
-          </div>
-
+        <div className="relative shadow-2xl overflow-hidden flex-shrink-0 my-auto">
+          <PdfViewer
+            documentId={documentId}
+            pageNumber={activeEvidence?.page_number || 1}
+            zoomLevel={zoomLevel}
+          />
           {/* Visual Grounding Bounding Box Overlay with zoom scale */}
           <BoundingBoxOverlay
             evidence={activeEvidence}

@@ -5,6 +5,7 @@ Enforces strict input validation, path traversal defense, and bounding box const
 """
 
 import re
+import tempfile
 from pathlib import Path
 from typing import List, Optional, Tuple, Literal
 from pydantic import BaseModel, Field, field_validator
@@ -15,6 +16,7 @@ ALLOWED_ROOTS = [
     Path(__file__).resolve().parents[3] / "benchmarks",
     Path(__file__).resolve().parents[3] / "data",
     Path("/tmp/finsight_test").resolve(),
+    Path(tempfile.gettempdir()).resolve(),
 ]
 
 

@@ -18,7 +18,7 @@ export const PdfViewer: FC<PdfViewerProps> = ({ documentId, pageNumber, zoomLeve
   }, [pageNumber, zoomLevel, renderPage]);
 
   return (
-    <div className="relative overflow-auto border border-slate-700 bg-white">
+    <div className="relative overflow-auto border border-slate-700 bg-white" role="presentation">
       {loading && <div className="absolute inset-0 flex items-center justify-center">Đang tải...</div>}
       <canvas ref={canvasRef} />
     </div>

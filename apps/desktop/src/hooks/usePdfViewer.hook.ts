@@ -4,8 +4,8 @@
 import { useRef, useState, useCallback } from 'react';
 import * as pdfjsLib from 'pdfjs-dist';
 
-// Set worker path from node_modules
-pdfjsLib.GlobalWorkerOptions.workerSrc = `/node_modules/pdfjs-dist/build/pdf.worker.min.mjs`;
+// Set worker path from public directory
+pdfjsLib.GlobalWorkerOptions.workerSrc = `/js/pdf.worker.min.mjs`;
 
 export function usePdfViewer(_documentId: string) {
   const canvasRef = useRef<HTMLCanvasElement>(null);

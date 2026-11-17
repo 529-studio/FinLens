@@ -172,3 +172,19 @@ class ModelDownloadResponse(BaseModel):
     cache_dir: str
     message: str
 
+
+class StoreStatsResponse(BaseModel):
+    """Storage statistics payload for persistent LanceDB multi-vector store."""
+    db_path: str
+    total_documents: int
+    total_pages: int
+    disk_size_bytes: int
+    vector_dimension: int
+
+
+class DocumentListResponse(BaseModel):
+    """List of indexed documents in persistent storage."""
+    documents: List[str]
+    total: int
+
+

@@ -8,22 +8,27 @@ Governed by ADR-001, Sprint 1 Issue #4, and 529 Engineering Standards.
 import os
 import hashlib
 from pathlib import Path
-from typing import List, Tuple, Dict, Any
+from typing import List, Tuple, Dict, Any, Optional
+
+from store import LanceDBStore, DEFAULT_LANCEDB_DIR
 
 
 class VisualRetriever:
     """
-    Manages document visual indexing and Late-Interaction (MaxSim) page retrieval.
+    Manages document visual indexing and Late-Interaction (MaxSim) page retrieval,
+    persisting page tensors and metadata into LanceDB.
     """
-    def __init__(self, index_base_dir: str = "~/.finsight/lancedb"):
-        self.index_base_dir = Path(os.path.expanduser(index_base_dir)).resolve()
-        self.index_base_dir.mkdir(parents=True, exist_ok=True)
-        # In-memory document registry mapping doc_id -> list of page metadata
-        self._registry: Dict[str, List[Dict[str, Any]]] = {}
+    def __init__(
+        self,
+        store: Optional[LanceDBStore] = None,
+        index_base_dir: Optional[str] = None,
+    ):
+        self.store = store or LanceDBStore(db_dir=index_base_dir or DEFAULT_LANCEDB_DIR)
+        self.index_base_dir = self.store.db_dir
 
     def index_document(self, document_id: str, pages: List[Tuple[int, Path, int, int]]) -> int:
         """
-        Indexes visual patches of rendered document pages.
+        Indexes visual patches of rendered document pages into persistent LanceDB storage.
         Returns total number of pages indexed.
         """
         indexed_pages = []
@@ -38,8 +43,7 @@ class VisualRetriever:
                 "signature": file_hash,
             })
 
-        self._registry[document_id] = indexed_pages
-        return len(indexed_pages)
+        return self.store.upsert_pages(document_id, indexed_pages)
 
     def search(self, document_id: str, query: str, top_k: int = 2) -> List[int]:
         """
@@ -47,9 +51,9 @@ class VisualRetriever:
         Maps question tokens directly to visual patch representations.
         Returns top-k candidate page numbers (1-indexed).
         """
-        pages = self._registry.get(document_id, [])
+        pages = self.store.get_pages(document_id)
         if not pages:
-            # Fallback to page 1 if document not yet in memory registry
+            # Fallback to page 1 if document not yet indexed in store
             return [1]
 
         query_lower = query.lower()

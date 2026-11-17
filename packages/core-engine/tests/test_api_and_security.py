@@ -179,3 +179,51 @@ def test_mlx_model_download_confirmed():
         assert data["status"] in ("downloaded", "cached")
         assert "model_id" in data
 
+
+# ==============================================================================
+# S3-03: LANCEDB STORE & DOCUMENT MANAGEMENT ENDPOINTS
+# ==============================================================================
+
+def test_store_stats_endpoint():
+    res = client.get("/api/v1/store/stats")
+    assert res.status_code == 200
+    data = res.json()
+    assert "db_path" in data
+    assert "total_documents" in data
+    assert "total_pages" in data
+    assert "disk_size_bytes" in data
+    assert data["vector_dimension"] == 128
+
+
+def test_documents_list_and_delete_endpoint():
+    # 1. Ingest document first
+    ingest_payload = {
+        "file_path": SAMPLE_PDF,
+        "document_id": "VNM_DELETE_FLOW",
+        "render_dpi": 150,
+    }
+    client.post("/api/v1/documents/ingest", json=ingest_payload)
+
+    # 2. List documents
+    res_list = client.get("/api/v1/documents")
+    assert res_list.status_code == 200
+    data_list = res_list.json()
+    assert "VNM_DELETE_FLOW" in data_list["documents"]
+    assert data_list["total"] >= 1
+
+    # 3. Delete document
+    res_del = client.delete("/api/v1/documents/VNM_DELETE_FLOW")
+    assert res_del.status_code == 200
+    assert res_del.json()["deleted"] is True
+
+    # 4. Verify no longer listed
+    res_list_after = client.get("/api/v1/documents")
+    assert "VNM_DELETE_FLOW" not in res_list_after.json()["documents"]
+
+
+def test_document_delete_security_traversal_rejected():
+    res = client.delete("/api/v1/documents/..%2F..%2Fetc%2Fpasswd")
+    # Path traversal must be blocked with 400 Bad Request or 404
+    assert res.status_code in (400, 404, 422)
+
+

@@ -5,6 +5,7 @@ Enforces strict input validation, path traversal defense, and bounding box const
 """
 
 import re
+import tempfile
 from pathlib import Path
 from typing import List, Optional, Tuple, Literal
 from pydantic import BaseModel, Field, field_validator
@@ -15,6 +16,7 @@ ALLOWED_ROOTS = [
     Path(__file__).resolve().parents[3] / "benchmarks",
     Path(__file__).resolve().parents[3] / "data",
     Path("/tmp/finsight_test").resolve(),
+    Path(tempfile.gettempdir()).resolve(),
 ]
 
 
@@ -169,4 +171,20 @@ class ModelDownloadResponse(BaseModel):
     status: str
     cache_dir: str
     message: str
+
+
+class StoreStatsResponse(BaseModel):
+    """Storage statistics payload for persistent LanceDB multi-vector store."""
+    db_path: str
+    total_documents: int
+    total_pages: int
+    disk_size_bytes: int
+    vector_dimension: int
+
+
+class DocumentListResponse(BaseModel):
+    """List of indexed documents in persistent storage."""
+    documents: List[str]
+    total: int
+
 

@@ -27,10 +27,13 @@ from contracts import (
     ModelStatusResponse,
     ModelDownloadRequest,
     ModelDownloadResponse,
+    StoreStatsResponse,
+    DocumentListResponse,
 )
 from renderer import PdfRenderer
 from retriever import VisualRetriever
 from vlm_router import VlmRouter
+from store import StoreSecurityError
 from model_manager import (
     ModelManager,
     DEFAULT_MODEL_ID,
@@ -114,6 +117,33 @@ def download_mlx_model(req: ModelDownloadRequest):
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Download error: {str(e)}")
+
+
+@app.get("/api/v1/store/stats", response_model=StoreStatsResponse)
+def get_store_stats():
+    """Returns disk footprint and record counts for persistent LanceDB store."""
+    stats = retriever.store.get_stats()
+    return StoreStatsResponse(**stats)
+
+
+@app.get("/api/v1/documents", response_model=DocumentListResponse)
+def list_indexed_documents():
+    """Lists all indexed documents currently persisted in LanceDB."""
+    docs = retriever.store.list_documents()
+    return DocumentListResponse(documents=docs, total=len(docs))
+
+
+@app.delete("/api/v1/documents/{doc_id}")
+def delete_indexed_document(doc_id: str):
+    """Deletes all page vectors and metadata for a document from LanceDB."""
+    try:
+        deleted = retriever.store.delete_document(doc_id)
+        if not deleted:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Document '{doc_id}' not found")
+        return {"document_id": doc_id, "deleted": True, "message": f"Document '{doc_id}' successfully removed"}
+    except StoreSecurityError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
 
 
 

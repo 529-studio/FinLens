@@ -147,3 +147,9 @@
 
 
 
+
+## Sprint 4 Post-Mortem
+- **Excel Add-in Requirements**: Office Add-ins strictly require HTTPS for local development. Vite configuration must enable SSL, and `Office.onReady()` is mandatory for React-based startup.
+- **Build Configuration**: Multi-entry build configuration in Vite (for `taskpane` and `functions`) is robust but requires meticulous `rollupOptions` management for manifest compatibility.
+- **Interop Security**: WebSocket IPC bridge requires environment-specific URL configuration (avoid hardcoding) and robust input/structure validation (`isValidCitationEvent`) to prevent arbitrary injection.
+- **Clean Code Standards**: Strict adherence to Rule 14B (no commented-out code, no `console.log` in production) is verified by independent audits; manual cleanup of scaffold comments is necessary.

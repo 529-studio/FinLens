@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<OfficeApp xmlns="http://schemas.microsoft.com/office/appforoffice/1.1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="TaskPaneApp">
+  <Id>529-studio-finsight-add-in</Id>
+  <Version>1.0.0.0</Version>
+  <ProviderName>529 Studio</ProviderName>
+  <DefaultLocale>en-US</DefaultLocale>
+  <DisplayName DefaultValue="FinSight Add-in (Production)" />
+  <Description DefaultValue="Financial Analyst Add-in (Production)" />
+  <Hosts>
+    <Host Name="Workbook" />
+  </Hosts>
+  <DefaultSettings>
+    <SourceLocation DefaultValue="https://finsight.529studio.site/taskpane.html" />
+  </DefaultSettings>
+</OfficeApp>

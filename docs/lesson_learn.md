@@ -148,7 +148,13 @@
 
 
 
-## Sprint 4 Post-Mortem
+
+---
+
+## Sprint 5 Post-Mortem
+- **WebSocket Connectivity**: Frontend `VITE_WS_BRIDGE_PORT` must exactly match the backend port configured for the `core-engine`. Explicitly defined the `/ws` endpoint in FastAPI and updated client to connect to `ws://localhost:8765/ws` to resolve 403 errors and connection failures.
+- **Environment Management**: Python dependencies in `core-engine` must be managed via `venv` (`python3 -m venv venv`) to avoid conflicts with system/Homebrew Python installations on macOS and ensure reproducible environments.
+
 - **Excel Add-in Requirements**: Office Add-ins strictly require HTTPS for local development. Vite configuration must enable SSL, and `Office.onReady()` is mandatory for React-based startup.
 - **Build Configuration**: Multi-entry build configuration in Vite (for `taskpane` and `functions`) is robust but requires meticulous `rollupOptions` management for manifest compatibility.
 - **Interop Security**: WebSocket IPC bridge requires environment-specific URL configuration (avoid hardcoding) and robust input/structure validation (`isValidCitationEvent`) to prevent arbitrary injection.

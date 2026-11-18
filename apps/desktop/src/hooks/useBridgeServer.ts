@@ -23,7 +23,7 @@ export const useBridgeServer = (onCitationJump: (citationId: string) => void) =>
       throw new Error('Invalid WebSocket port configured.');
     }
 
-    const socket = new WebSocket(`ws://localhost:${port}`);
+    const socket = new WebSocket(`ws://127.0.0.1:${port}/ws`);
 
     socket.onmessage = (event) => {
       try {

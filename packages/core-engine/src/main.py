@@ -8,7 +8,7 @@ import re
 import time
 import os
 from pathlib import Path
-from fastapi import FastAPI, HTTPException, status
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 
@@ -172,16 +172,16 @@ def list_indexed_documents():
     return DocumentListResponse(documents=docs, total=len(docs))
 
 
-@app.delete("/api/v1/documents/{doc_id}")
-def delete_indexed_document(doc_id: str):
-    """Deletes all page vectors and metadata for a document from LanceDB."""
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    await websocket.accept()
     try:
-        deleted = retriever.store.delete_document(doc_id)
-        if not deleted:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Document '{doc_id}' not found")
-        return {"document_id": doc_id, "deleted": True, "message": f"Document '{doc_id}' successfully removed"}
-    except StoreSecurityError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        while True:
+            data = await websocket.receive_text()
+            # Simple echo or handle navigation requests if defined
+            await websocket.send_text(f"Message received: {data}")
+    except WebSocketDisconnect:
+        pass
 
 
 

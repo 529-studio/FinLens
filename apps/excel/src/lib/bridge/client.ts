@@ -1,4 +1,6 @@
+/// <reference types="vite/client" />
 export interface CitationEvent {
+
   type: 'JUMP_TO_SOURCE';
   citationId: string;
 }

@@ -4,7 +4,7 @@ export const fetchQueryResult = async (query: string): Promise<QueryResult> => {
   // Simulate API call
   return new Promise((resolve) => {
     setTimeout(() => {
-      resolve({ id: '1', data: `Result for ${query}` });
+      resolve({ id: '1', data: `Result for ${query}`, confidence: 0.98 });
     }, 1000);
   });
 };

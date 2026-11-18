@@ -33,6 +33,9 @@
 
 - #13 ([excel] S5-01: Implement real citation navigation logic): Open — Scheduled for Sprint 5.
 - #14 ([excel] S5-02: Sidebar UI refinement - Financial Analyst Usability): Open — Scheduled for Sprint 5.
+- #15 ([excel] S5-03: Financial Analyst Usability features (grounding highlights, confidence badges)): Open — Scheduled for Sprint 5.
+- #16 ([excel] S5-04: Setup centralized manifest (manifest.xml) deployment strategy): Open — Scheduled for Sprint 5.
+- #17 ([excel] S5-05: Conduct E2E testing for the full citation flow): Open — Scheduled for Sprint 5.
 
 ---
 

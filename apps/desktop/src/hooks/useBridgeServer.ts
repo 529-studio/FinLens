@@ -11,8 +11,33 @@ const isValidCitationEvent = (data: any): data is { type: 'JUMP_TO_SOURCE'; cita
   );
 };
 
-export const useBridgeServer = () => {
+export const useBridgeServer = (onCitationJump: (citationId: string) => void) => {
   useEffect(() => {
-    // Placeholder: Implement WebSocket server logic or IPC listener here
-  }, []);
+    const rawPort = import.meta.env.VITE_WS_BRIDGE_PORT;
+    if (!rawPort) {
+      throw new Error('VITE_WS_BRIDGE_PORT is not defined in environment variables.');
+    }
+    const port = parseInt(rawPort, 10);
+    
+    if (isNaN(port)) {
+      throw new Error('Invalid WebSocket port configured.');
+    }
+
+    const socket = new WebSocket(`ws://localhost:${port}`);
+
+    socket.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (isValidCitationEvent(data)) {
+          onCitationJump(data.citationId);
+        }
+      } catch (e) {
+        console.error('Failed to parse WebSocket message', e);
+      }
+    };
+
+    return () => {
+      socket.close();
+    };
+  }, [onCitationJump]);
 };

@@ -8,6 +8,7 @@
 import { useState, type FormEvent, type FC } from 'react';
 import { useVisualRag } from '../../hooks/useVisualRag.hook';
 import { useSettings } from '../../hooks/useSettings.hook';
+import { useBridgeServer } from '../../hooks/useBridgeServer';
 import { ResizableSplitView } from './ResizableSplitView';
 import { BoundingBoxOverlay } from '../pdf/BoundingBoxOverlay';
 import { PdfViewer } from '../pdf/PdfViewer';
@@ -38,6 +39,17 @@ export const SplitView: FC<SplitViewProps> = ({ documentId, documentTitle }) => 
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
   const { state, error, history, activeEvidence, ask, focusEvidence, clearError } = useVisualRag(documentId);
   const { inferenceMode } = useSettings();
+
+  useBridgeServer((citationId) => {
+    console.log(`Navigation requested for citation: ${citationId}`);
+    // Assume evidence has an ID or we can map citationId to evidence
+    // Based on the history structure, we need a reliable way to map ID
+    const allEvidences = history.flatMap(h => h.evidences);
+    const evidence = allEvidences.find(e => e.label === citationId); // Simplified lookup
+    if (evidence) {
+      focusEvidence(evidence);
+    }
+  });
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();

@@ -202,20 +202,36 @@ export const SplitView: FC<SplitViewProps> = ({ documentId, documentTitle }) => 
                 {/* Audit Trail Evidence Chips */}
                 {msg.evidences.length > 0 && (
                   <div className="pt-2 border-t border-slate-700/80">
-                    <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block mb-2">
-                      Bằng chứng kiểm toán (Visual Grounding):
-                    </span>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">
+                        Bằng chứng kiểm toán (Visual Grounding):
+                      </span>
+                      {new Set(msg.evidences.map((e) => e.page_number)).size > 1 && (
+                        <span className="text-[10px] font-medium bg-indigo-900/60 border border-indigo-700/60 text-indigo-300 px-2 py-0.5 rounded-full">
+                          Liên kết đa trang ({new Set(msg.evidences.map((e) => e.page_number)).size} trang)
+                        </span>
+                      )}
+                    </div>
                     <div className="flex flex-wrap gap-2">
-                      {msg.evidences.map((ev, evIdx) => (
-                        <button
-                          key={evIdx}
-                          onClick={() => focusEvidence(ev)}
-                          className="min-h-[48px] px-3 py-1.5 bg-red-950/60 hover:bg-red-900/60 border border-red-700/60 text-red-300 text-xs rounded-lg flex items-center space-x-2 transition cursor-pointer"
-                        >
-                          <ExternalLink className="w-3.5 h-3.5" />
-                          <span>P.{ev.page_number}: {ev.label}</span>
-                        </button>
-                      ))}
+                      {msg.evidences.map((ev, evIdx) => {
+                        const isActive =
+                          activeEvidence?.page_number === ev.page_number &&
+                          activeEvidence?.label === ev.label;
+                        return (
+                          <button
+                            key={evIdx}
+                            onClick={() => focusEvidence(ev)}
+                            className={`min-h-[48px] px-3 py-1.5 border text-xs rounded-lg flex items-center space-x-2 transition cursor-pointer ${
+                              isActive
+                                ? 'bg-red-800/80 border-red-500 text-white font-medium shadow-md'
+                                : 'bg-red-950/60 hover:bg-red-900/60 border-red-700/60 text-red-300'
+                            }`}
+                          >
+                            <ExternalLink className="w-3.5 h-3.5 flex-shrink-0" />
+                            <span>P.{ev.page_number}: {ev.label}</span>
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
                 )}

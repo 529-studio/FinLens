@@ -8,7 +8,7 @@ Governed by ADR-002, ADR-003, and AGENTS.md Rule 13:
 
 import os
 import logging
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Tuple
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -36,15 +36,14 @@ class VlmRouter:
             return "mlx_apple_silicon"
         return "cpu_generic"
 
-    async def analyze_page(
+    async def analyze_pages(
         self,
-        image_path: str,
-        page_number: int,
+        pages: List[Tuple[str, int]],
         query: str,
         preferred_mode: str = "auto"
     ) -> Dict[str, Any]:
         """
-        Dispatches page analysis to either Local MLX or Cloud Provider.
+        Dispatches multi-page visual analysis and evidence linkage to either Local MLX or Cloud Provider.
         """
         mode = preferred_mode if preferred_mode != "auto" else self.default_mode
 
@@ -53,9 +52,21 @@ class VlmRouter:
             mode = "local" if hw == "mlx_apple_silicon" else "cloud"
 
         if mode == "local":
-            return await self._infer_local_mlx(image_path, page_number, query)
+            return self.mlx_engine.analyze_pages(pages, query)
         else:
-            return await self._infer_cloud_litellm(image_path, page_number, query)
+            return await self.cloud_router.analyze_pages(pages, query)
+
+    async def analyze_page(
+        self,
+        image_path: str,
+        page_number: int,
+        query: str,
+        preferred_mode: str = "auto"
+    ) -> Dict[str, Any]:
+        """
+        Dispatches page analysis to either Local MLX or Cloud Provider. Delegates to analyze_pages.
+        """
+        return await self.analyze_pages([(image_path, page_number)], query, preferred_mode)
 
     async def _infer_local_mlx(self, image_path: str, page_number: int, query: str) -> Dict[str, Any]:
         """Local MLX inference with normalized coordinates (0-1000 scale)."""

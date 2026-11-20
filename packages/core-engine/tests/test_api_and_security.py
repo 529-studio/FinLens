@@ -303,5 +303,65 @@ def test_websocket_broadcast_interop():
             assert received == payload
 
 
+def test_multipage_evidence_linkage_query_flow():
+    """
+    S6-02 Verification: Multi-page visual evidence linkage.
+    Ensures query across revenue and balance sheet returns multi-page evidences (P.1 + P.2).
+    """
+    # 1. Ensure document is ingested
+    ingest_payload = {
+        "file_path": SAMPLE_PDF,
+        "document_id": "VNM_MULTIPAGE_TEST",
+        "render_dpi": 150,
+    }
+    res_ingest = client.post("/api/v1/documents/ingest", json=ingest_payload)
+    assert res_ingest.status_code == 200
+
+    # 2. Query demanding cross-page linkage between Revenue (P1) and Balance Sheet Cash (P2)
+    query_payload = {
+        "document_id": "VNM_MULTIPAGE_TEST",
+        "query_text": "Phân tích toàn diện liên kết cơ cấu doanh thu và số dư tiền mặt tài sản",
+        "top_k_pages": 2,
+    }
+    res_query = client.post("/api/v1/query", json=query_payload)
+    assert res_query.status_code == 200
+    data = res_query.json()
+
+    # Must retrieve both pages
+    assert 1 in data["retrieved_page_numbers"]
+    assert 2 in data["retrieved_page_numbers"]
+    assert len(data["retrieved_page_numbers"]) == 2
+
+    # Evidence linkage must contain visual grounding for BOTH pages
+    evidence_pages = {ev["page_number"] for ev in data["evidences"]}
+    assert 1 in evidence_pages, "Must contain grounded evidence from Page 1 (Revenue Chart)"
+    assert 2 in evidence_pages, "Must contain grounded evidence from Page 2 (Balance Sheet/Footnote)"
+    assert len(data["evidences"]) >= 2
+
+    # Verify each bounding box satisfies ADR-003 normalized 0-1000 scale
+    for ev in data["evidences"]:
+        bbox = ev["bounding_box"]
+        assert 0 <= bbox["ymin"] < bbox["ymax"] <= 1000
+        assert 0 <= bbox["xmin"] < bbox["xmax"] <= 1000
+        assert ev["confidence"] >= 0.8
+        assert ev["label"]
+
+    # Answer must synthesize findings across both pages
+    assert "Trang 1" in data["answer"] or "trang 1" in data["answer"]
+    assert "Trang 2" in data["answer"] or "trang 2" in data["answer"]
+    assert "Phân tích liên trang" in data["answer"] or "Bằng chứng liên trang" in data["answer"]
+
+
+def test_retriever_get_linked_pages():
+    """Verify retriever identifies linked/cross-referenced pages within document."""
+    from retriever import VisualRetriever
+    retriever = VisualRetriever()
+    linked = retriever.get_linked_pages("VNM_MULTIPAGE_TEST", primary_page=1)
+    assert 1 in linked
+    assert 2 in linked
+    assert linked[0] == 1
+
+
+
 
 

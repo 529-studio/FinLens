@@ -258,15 +258,18 @@ async def ingest_document(req: DocumentIngestRequest):
 async def query_financial_document(req: QueryRequest):
     start_time = time.time()
 
-    # Step 1: Visual Late-Interaction candidate page retrieval
+    # Step 1: Visual Late-Interaction candidate page retrieval (with multi-page evidence linkage)
     candidate_pages = retriever.search(req.document_id, req.query_text, top_k=req.top_k_pages)
-    primary_page = candidate_pages[0] if candidate_pages else 1
+    if not candidate_pages:
+        candidate_pages = [1]
 
-    # Step 2: VLM visual grounding and reasoning
-    dummy_img_path = f"~/.finsight/cache/rendered_pages/{req.document_id}/page_{primary_page:04d}.png"
-    vlm_result = await router.analyze_page(
-        image_path=dummy_img_path,
-        page_number=primary_page,
+    # Step 2: Multi-page VLM visual grounding and cross-page reasoning
+    page_tuples = [
+        (f"~/.finsight/cache/rendered_pages/{req.document_id}/page_{p:04d}.png", p)
+        for p in candidate_pages
+    ]
+    vlm_result = await router.analyze_pages(
+        pages=page_tuples,
         query=req.query_text,
         preferred_mode=req.inference_mode,
     )

@@ -74,7 +74,24 @@ class VisualRetriever:
                 if p_num == 2:
                     score += 3.0
 
+            # Multi-page cross-reference and comprehensive analysis heuristics
+            if any(k in query_lower for k in ["liên kết", "đa trang", "toàn diện", "tổng hợp", "so sánh", "báo cáo", "bctc", "cross-page", "multi-page", "tổng quan"]):
+                score += 2.0
+
             scored_pages.append((p_num, score))
 
-        scored_pages.sort(key=lambda x: x[1], reverse=True)
+        scored_pages.sort(key=lambda x: (x[1], -x[0]), reverse=True)
         return [p[0] for p in scored_pages[:top_k]]
+
+    def get_linked_pages(self, document_id: str, primary_page: int) -> List[int]:
+        """
+        Returns linked/cross-referenced pages for a given primary page within the document.
+        For example, page 1 (Overview & Charts) is linked with page 2 (Balance Sheet & Footnotes).
+        """
+        pages = self.store.get_pages(document_id)
+        if not pages:
+            return [primary_page]
+        all_page_nums = sorted([p["page_number"] for p in pages])
+        # Return all other pages in the document as linked context
+        linked = [p for p in all_page_nums if p != primary_page]
+        return [primary_page] + linked

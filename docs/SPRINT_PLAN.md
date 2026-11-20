@@ -97,3 +97,25 @@
 - [ ] Thao tác 1-Click đưa số liệu từ biểu đồ/bảng BCTC vào bảng tính Excel chính xác 100% dòng/cột.
 - [ ] Kiểm toán viên click vào ô tính có thể xem ngay hình ảnh chứng minh gốc.
 - [ ] Toàn bộ bài học kinh nghiệm và kiến trúc được thu hoạch đồng bộ vào Lore và `529-engineering-skills`.
+
+---
+
+## Sprint 6: Triển Khai Trung Tâm, Visual RAG Nâng Cao & Tối Ưu Hiệu Năng
+- **Mục tiêu chính:** Hoàn thiện hạ tầng triển khai sản phẩm, cải thiện khả năng RAG trên tài liệu lớn và tối ưu hóa xử lý.
+- **Thời lượng dự kiến:** 2 tuần
+- **Chủ trì kỹ thuật:** `lead-architect` & `rag-ml-engineer`
+
+### Task Breakdown & Phân Công:
+
+| Mã Task | Phân công | Mô tả công việc | Deliverables / Đầu ra |
+|:--------|:----------|:----------------|:----------------------|
+| **S6-01** | `lead-architect` | Triển khai Centralized Deployment: Publish `manifest.xml` và cấu hình server production. | Manifest sản phẩm hợp lệ, CI/CD pipeline cho production. |
+| **S6-02** | `rag-ml-engineer` | Advanced Visual RAG: Tích hợp multi-page evidence linkage. | Module RAG kết nối dữ liệu chéo giữa các trang. |
+| **S6-03** | `rag-ml-engineer` | Tối ưu hóa hiệu năng: Tăng tốc xử lý parsing các báo cáo tài chính quy mô lớn. | Benchmark hiệu năng mới, xử lý nhanh hơn 30%. |
+
+### Definition of Done (DoD) Sprint 6:
+- [ ] Manifest được publish thành công và hoạt động trên môi trường production.
+- [ ] Visual RAG hỗ trợ trích dẫn liên trang (multi-page) chính xác.
+- [ ] Hiệu năng xử lý báo cáo tài chính lớn được cải thiện rõ rệt theo benchmark.
+- [ ] Toàn bộ kết quả kiểm thử được lưu trữ và bài học được ghi lại vào Lore.
+

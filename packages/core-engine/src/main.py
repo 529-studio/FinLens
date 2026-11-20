@@ -8,7 +8,7 @@ import re
 import time
 import os
 from pathlib import Path
-from fastapi import FastAPI, HTTPException, status
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 
@@ -182,6 +182,45 @@ def delete_indexed_document(doc_id: str):
         return {"document_id": doc_id, "deleted": True, "message": f"Document '{doc_id}' successfully removed"}
     except StoreSecurityError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+class ConnectionManager:
+    """Manages active WebSocket connections and broadcasts IPC citation events between Excel and Desktop."""
+    def __init__(self):
+        self.active_connections: list[WebSocket] = []
+
+    async def connect(self, websocket: WebSocket):
+        await websocket.accept()
+        self.active_connections.append(websocket)
+
+    def disconnect(self, websocket: WebSocket):
+        if websocket in self.active_connections:
+            self.active_connections.remove(websocket)
+
+    async def broadcast(self, message: str, sender: WebSocket):
+        for connection in list(self.active_connections):
+            if connection != sender:
+                try:
+                    await connection.send_text(message)
+                except Exception:
+                    self.disconnect(connection)
+
+
+ws_manager = ConnectionManager()
+
+
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    await ws_manager.connect(websocket)
+    try:
+        while True:
+            data = await websocket.receive_text()
+            # Broadcast raw message payload (e.g. JSON citation event) to peer clients
+            await ws_manager.broadcast(data, sender=websocket)
+    except WebSocketDisconnect:
+        ws_manager.disconnect(websocket)
+    except Exception:
+        ws_manager.disconnect(websocket)
 
 
 

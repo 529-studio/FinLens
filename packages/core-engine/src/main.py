@@ -172,6 +172,18 @@ def list_indexed_documents():
     return DocumentListResponse(documents=docs, total=len(docs))
 
 
+@app.delete("/api/v1/documents/{doc_id}")
+def delete_indexed_document(doc_id: str):
+    """Deletes all page vectors and metadata for a document from LanceDB."""
+    try:
+        deleted = retriever.store.delete_document(doc_id)
+        if not deleted:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Document '{doc_id}' not found")
+        return {"document_id": doc_id, "deleted": True, "message": f"Document '{doc_id}' successfully removed"}
+    except StoreSecurityError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()

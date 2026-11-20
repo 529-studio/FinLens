@@ -162,3 +162,22 @@
   - Thêm `QueryLRUCache` bộ nhớ đệm trong RAM với khóa `(doc_id, query, top_k, mode)` bọc bởi `threading.RLock()`, đưa độ trễ của các truy vấn lặp lại xuống mức tức thì `< 1ms` (thực nghiệm `0.05ms - 0.58ms`).
   - Đóng dấu cờ `cached: bool` trên API và hiển thị huy hiệu `Cache` màu ngọc lục bảo (emerald) tinh tế trên giao diện máy tính.
 
+---
+
+## Lesson 15: Office.js Taskpane Web Sandbox Multipart Upload & Phòng thủ Traversal trong Tải Lên Tệp PDF
+- **Bối cảnh:** Khi tài chính gia thao tác trên Microsoft Excel qua Office.js Web Add-in (chạy trong iframe hoặc webview sandbox của trình duyệt), ứng dụng JavaScript không thể truy cập trực tiếp đường dẫn tập tin tuyệt đối trên hệ điều hành cục bộ (`req.file_path`). Do đó, luồng nạp báo cáo tài chính bắt buộc phải hỗ trợ tải trực tiếp dữ liệu nhị phân hoặc đa phần (multipart stream upload) từ file picker.
+- **Cạm bẫy & Lỗ hổng bảo mật:**
+  1. *Lỗ hổng Path Traversal trong tiêu đề Content-Disposition:* Tham số `filename` do trình duyệt gửi lên trong multipart form-data có thể bị kẻ tấn công thao túng chứa chuỗi thoát thư mục như `../../evil.pdf` hoặc null bytes (`\0`). Nếu backend ghép chuỗi trực tiếp để lưu trữ, tệp tin độc hại có thể bị ghi đè ra ngoài thư mục an toàn.
+  2. *Tệp tin giả mạo định dạng (MIME Spoofing):* Kẻ tấn công có thể đổi tên tệp thực thi độc hại hoặc mã script shell thành `.pdf`. Kiểm tra phần mở rộng tệp là không đủ.
+  3. *Trải nghiệm người dùng trong Taskpane hẹp:* Trong không gian bề ngang hẹp (300px - 400px) của taskpane Excel, nếu không tuân thủ quy chuẩn 3 trạng thái giao diện (Skeleton, Error có retry, Actionable Empty) và quy chuẩn kích thước bấm tối thiểu $\ge 48\text{px}$, người dùng sẽ gặp khó khăn khi thao tác kéo thả hoặc chọn tệp.
+- **Giải pháp chuẩn hóa (Sprint 7 - Task S7-01):**
+  - Xây dựng endpoint `POST /api/v1/documents/upload` tiếp nhận `file: UploadFile = File(...)` với thư mục lưu trữ cô lập `~/.finsight/uploads/`.
+  - Xác thực đa tầng: Chặn triệt để ký tự `..`, `/`, `\`, `\0`; lọc tên tệp qua regex nghiêm ngặt `^[a-zA-Z0-9_\-\.]+$` và ràng buộc `target_path.parent == UPLOAD_DIR`.
+  - Xác thực magic bytes: Đọc trước 1024 bytes đầu tiên để xác nhận chữ ký nhị phân `%PDF-` trước khi tiến hành lưu luồng tệp đầy đủ.
+  - Áp dụng triệt để mô hình **Frontend 4-file pattern** trên `apps/excel`:
+    - `src/types/api.ts` (DTOs)
+    - `src/lib/api/finsight.ts` (Pure fetch có timeout và User-Agent)
+    - `src/lib/hooks/use-ingest.ts` (TanStack Query mutation)
+    - `src/components/DocumentUploader.tsx` & `Sidebar.tsx` (Xử lý trọn vẹn 3 trạng thái UI, Kiosk touch target $\ge 48\text{px}$, 100% SVG Lucide React, 0 raw emoji).
+
+

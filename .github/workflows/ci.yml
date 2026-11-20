@@ -39,3 +39,19 @@ jobs:
           npm install --prefix apps/desktop
       - name: Run Desktop Tests
         run: npm --prefix apps/desktop test
+
+  test-excel:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install Dependencies
+        run: |
+          npm install
+          npm install --prefix apps/excel
+      - name: Build Excel Add-in
+        run: npm --prefix apps/excel run build
+

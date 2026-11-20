@@ -362,6 +362,51 @@ def test_retriever_get_linked_pages():
     assert linked[0] == 1
 
 
+def test_upload_valid_pdf_success():
+    """Verify multipart PDF upload, indexing, and response metadata."""
+    with open(SAMPLE_PDF, "rb") as f:
+        pdf_bytes = f.read()
+
+    files = {"file": ("VNM_UPLOAD_TEST.pdf", pdf_bytes, "application/pdf")}
+    data = {"document_id": "VNM_UPLOAD_TEST", "render_dpi": "150"}
+    res = client.post("/api/v1/documents/upload", files=files, data=data)
+    assert res.status_code == 200
+    res_data = res.json()
+    assert res_data["document_id"] == "VNM_UPLOAD_TEST"
+    assert res_data["total_pages"] == 2
+    assert res_data["indexed_vectors_count"] == 2
+    assert len(res_data["rendered_image_paths"]) == 2
+    assert res_data["duration_ms"] > 0
+
+
+def test_upload_traversal_filename_rejected():
+    """Verify that path traversal in uploaded filename is rejected with 400."""
+    with open(SAMPLE_PDF, "rb") as f:
+        pdf_bytes = f.read()
+
+    files = {"file": ("../../evil.pdf", pdf_bytes, "application/pdf")}
+    res = client.post("/api/v1/documents/upload", files=files)
+    assert res.status_code == 400
+    assert "Invalid filename" in res.json()["detail"] or "traversal" in res.json()["detail"]
+
+
+def test_upload_non_pdf_rejected():
+    """Verify uploading non-PDF or spoofed MIME returns 400."""
+    files = {"file": ("data.txt", b"plain text content", "text/plain")}
+    res = client.post("/api/v1/documents/upload", files=files)
+    assert res.status_code == 400
+    assert "PDF" in res.json()["detail"]
+
+
+def test_upload_empty_file_rejected():
+    """Verify uploading 0-byte file returns 400."""
+    files = {"file": ("empty.pdf", b"", "application/pdf")}
+    res = client.post("/api/v1/documents/upload", files=files)
+    assert res.status_code == 400
+    assert "empty" in res.json()["detail"].lower()
+
+
+
 
 
 

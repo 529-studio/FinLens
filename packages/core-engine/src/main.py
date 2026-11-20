@@ -9,7 +9,7 @@ import time
 import os
 from typing import Optional, List, Dict, Any
 from pathlib import Path
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, status
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, status, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 
@@ -213,6 +213,94 @@ class ConnectionManager:
 
 
 ws_manager = ConnectionManager()
+
+UPLOAD_DIR = Path("~/.finsight/uploads").expanduser().resolve()
+UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
+
+@app.post("/api/v1/documents/upload", response_model=DocumentIngestResponse)
+async def upload_document(
+    file: UploadFile = File(...),
+    render_dpi: int = Form(150),
+    document_id: Optional[str] = Form(None),
+):
+    start_time = time.time()
+
+    # 1. Filename sanitization & path traversal check (Rule 13B)
+    if not file.filename:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing filename in uploaded file")
+
+    raw_filename = file.filename
+    if ".." in raw_filename or "/" in raw_filename or "\\" in raw_filename or "\0" in raw_filename:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid filename: path traversal or invalid characters detected",
+        )
+
+    if not raw_filename.lower().endswith(".pdf"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Uploaded file must be a valid PDF format (.pdf)",
+        )
+
+    clean_stem = re.sub(r"[^a-zA-Z0-9_\-]", "_", Path(raw_filename).stem)[:64]
+    if not clean_stem:
+        clean_stem = f"doc_{int(time.time())}"
+    sanitized_filename = f"{clean_stem}.pdf"
+
+    target_path = (UPLOAD_DIR / sanitized_filename).resolve()
+    if target_path.parent != UPLOAD_DIR:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid target path: traversal detected",
+        )
+
+    # 2. Magic byte check & safe streaming
+    header = await file.read(1024)
+    if not header:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Uploaded file is empty (0 bytes)")
+
+    if not header.startswith(b"%PDF-"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Uploaded file must be a valid PDF format (missing %PDF- header)",
+        )
+
+    with open(target_path, "wb") as f_out:
+        f_out.write(header)
+        while True:
+            chunk = await file.read(64 * 1024)
+            if not chunk:
+                break
+            f_out.write(chunk)
+
+    # 3. Determine doc_id & execute rendering and indexing
+    raw_id = document_id or clean_stem
+    doc_id = re.sub(r"[^a-zA-Z0-9_\-]", "_", raw_id)[:64]
+
+    try:
+        pages = renderer.render_document(str(target_path), doc_id, dpi=render_dpi)
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Render error: {str(e)}")
+
+    indexed_count = retriever.index_document(doc_id, pages)
+    cache_manager.query_cache.invalidate_document(doc_id)
+
+    duration_ms = (time.time() - start_time) * 1000.0
+
+    return DocumentIngestResponse(
+        document_id=doc_id,
+        total_pages=len(pages),
+        rendered_image_paths=[str(p[1]) for p in pages],
+        indexed_vectors_count=indexed_count,
+        duration_ms=round(duration_ms, 2),
+        from_cache=renderer.last_render_from_cache,
+    )
+
 
 
 @app.websocket("/ws")

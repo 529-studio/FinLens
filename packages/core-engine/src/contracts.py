@@ -109,6 +109,7 @@ class DocumentIngestResponse(BaseModel):
     rendered_image_paths: List[str]
     indexed_vectors_count: int
     duration_ms: float
+    from_cache: bool = Field(False, description="Whether rendered pages were loaded directly from local cache")
 
 
 class QueryRequest(BaseModel):
@@ -144,6 +145,34 @@ class QueryResponse(BaseModel):
     retrieved_page_numbers: List[int]
     engine_used: str = Field(..., description="e.g. 'mlx-qwen2.5-vl-7b-4bit' or 'claude-3-5-sonnet'")
     latency_ms: float
+    cached: bool = Field(False, description="Whether query response was retrieved from in-memory LRU cache")
+
+
+class CacheStatsResponse(BaseModel):
+    """Cache performance statistics for local rendering and in-memory queries."""
+    total_cached_documents: int
+    total_cached_pages: int
+    rendered_cache_bytes: int
+    in_memory_query_cache_entries: int
+    query_cache_hits: int
+    query_cache_misses: int
+    hit_ratio: float
+
+
+class CacheClearRequest(BaseModel):
+    """Request payload to clear memory or disk caches."""
+    scope: Literal["all", "queries", "documents"] = Field("all", description="Cache clearing scope")
+    document_id: Optional[str] = Field(None, description="Optional document ID to clear specific document cache")
+
+    @field_validator("document_id")
+    @classmethod
+    def sanitize_doc_id(cls, v: Optional[str]):
+        if v is not None:
+            if not re.match(r"^[a-zA-Z0-9_\-]+$", v):
+                raise ValueError("document_id must be strictly alphanumeric (letters, digits, _, -)")
+            if len(v) > 64:
+                raise ValueError("document_id must not exceed 64 characters")
+        return v
 
 
 class ModelStatusResponse(BaseModel):

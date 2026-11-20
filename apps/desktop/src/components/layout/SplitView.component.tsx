@@ -236,9 +236,16 @@ export const SplitView: FC<SplitViewProps> = ({ documentId, documentTitle }) => 
                   </div>
                 )}
 
-                <div className="text-[10px] text-slate-400 flex justify-between pt-1">
+                <div className="text-[10px] text-slate-400 flex justify-between items-center pt-1">
                   <span>Engine: {msg.engine_used}</span>
-                  <span>{msg.latency_ms} ms</span>
+                  <span className="flex items-center space-x-1.5 font-mono">
+                    {msg.cached && (
+                      <span className="text-[9px] text-emerald-400 bg-emerald-950/70 border border-emerald-800/60 px-1.5 py-0.5 rounded uppercase tracking-wider font-semibold">
+                        Cache
+                      </span>
+                    )}
+                    <span>{msg.latency_ms} ms</span>
+                  </span>
                 </div>
               </div>
             </div>

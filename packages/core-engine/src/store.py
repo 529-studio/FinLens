@@ -59,6 +59,7 @@ class LanceDBStore:
         self.db_dir.mkdir(parents=True, exist_ok=True)
         self._db = None
         self._table = None
+        self._pages_cache: Dict[str, List[Dict[str, Any]]] = {}
 
     def _sanitize_doc_id(self, doc_id: str) -> str:
         """Sanitizes document_id and rejects injection / path traversal characters."""
@@ -142,11 +143,15 @@ class LanceDBStore:
         if rows:
             self._table.add(rows)
 
+        self._pages_cache.pop(clean_id, None)
         return len(rows)
 
     def get_pages(self, doc_id: str) -> List[Dict[str, Any]]:
-        """Retrieves all indexed pages for a given document, sorted by page_number."""
+        """Retrieves all indexed pages for a given document, sorted by page_number (cached in-memory)."""
         clean_id = self._sanitize_doc_id(doc_id)
+        if clean_id in self._pages_cache:
+            return self._pages_cache[clean_id]
+
         self._ensure_connected()
 
         try:
@@ -181,6 +186,7 @@ class LanceDBStore:
             })
 
         formatted.sort(key=lambda x: x["page_number"])
+        self._pages_cache[clean_id] = formatted
         return formatted
 
     def search(self, doc_id: str, query_vector: List[float], top_k: int = 2) -> List[Dict[str, Any]]:
@@ -210,10 +216,15 @@ class LanceDBStore:
 
         try:
             self._table.delete(f"doc_id = '{clean_id}'")
+            self._pages_cache.pop(clean_id, None)
             return True
         except Exception as e:
             logger.error("Failed to delete document %s: %s", clean_id, e)
             return False
+
+    def clear_memory_cache(self) -> None:
+        """Clears the in-memory document page cache."""
+        self._pages_cache.clear()
 
     def list_documents(self) -> List[str]:
         """Returns the unique list of document identifiers currently indexed."""

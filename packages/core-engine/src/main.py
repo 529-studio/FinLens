@@ -7,6 +7,7 @@ Governed by ADR-001, ADR-004, and AGENTS.md Rule 13 (Security & Injection Defens
 import re
 import time
 import os
+from typing import Optional, List, Dict, Any
 from pathlib import Path
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -33,12 +34,15 @@ from contracts import (
     CloudProviderDetail,
     CloudKeyUpdateRequest,
     CloudKeyUpdateResponse,
+    CacheStatsResponse,
+    CacheClearRequest,
 )
 from renderer import PdfRenderer
 from retriever import VisualRetriever
 from vlm_router import VlmRouter
 from cloud_router import CloudRouter
 from store import StoreSecurityError
+from cache_manager import cache_manager
 from model_manager import (
     ModelManager,
     DEFAULT_MODEL_ID,
@@ -174,11 +178,13 @@ def list_indexed_documents():
 
 @app.delete("/api/v1/documents/{doc_id}")
 def delete_indexed_document(doc_id: str):
-    """Deletes all page vectors and metadata for a document from LanceDB."""
+    """Deletes all page vectors and metadata for a document from LanceDB and clears associated caches."""
     try:
         deleted = retriever.store.delete_document(doc_id)
         if not deleted:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Document '{doc_id}' not found")
+        # Invalidate caches for this document
+        cache_manager.clear(scope="all", document_id=doc_id)
         return {"document_id": doc_id, "deleted": True, "message": f"Document '{doc_id}' successfully removed"}
     except StoreSecurityError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
@@ -243,6 +249,9 @@ async def ingest_document(req: DocumentIngestRequest):
     # Index into Visual Retriever
     indexed_count = retriever.index_document(doc_id, pages)
 
+    # Invalidate prior query cache entries for this document
+    cache_manager.query_cache.invalidate_document(doc_id)
+
     duration_ms = (time.time() - start_time) * 1000.0
 
     return DocumentIngestResponse(
@@ -251,12 +260,33 @@ async def ingest_document(req: DocumentIngestRequest):
         rendered_image_paths=[str(p[1]) for p in pages],
         indexed_vectors_count=indexed_count,
         duration_ms=round(duration_ms, 2),
+        from_cache=renderer.last_render_from_cache,
     )
 
 
 @app.post("/api/v1/query", response_model=QueryResponse)
 async def query_financial_document(req: QueryRequest):
     start_time = time.time()
+
+    # Fast LRU query cache lookup (reduces latency to < 5ms for repeated queries)
+    cached_resp = cache_manager.query_cache.get(
+        doc_id=req.document_id,
+        query_text=req.query_text,
+        top_k=req.top_k_pages,
+        mode=req.inference_mode,
+    )
+    if cached_resp is not None:
+        duration_ms = (time.time() - start_time) * 1000.0
+        return QueryResponse(
+            document_id=req.document_id,
+            query_text=req.query_text,
+            answer=cached_resp["answer"],
+            evidences=cached_resp["evidences"],
+            retrieved_page_numbers=cached_resp["retrieved_page_numbers"],
+            engine_used=cached_resp["engine_used"],
+            latency_ms=round(duration_ms, 2),
+            cached=True,
+        )
 
     # Step 1: Visual Late-Interaction candidate page retrieval (with multi-page evidence linkage)
     candidate_pages = retriever.search(req.document_id, req.query_text, top_k=req.top_k_pages)
@@ -290,6 +320,20 @@ async def query_financial_document(req: QueryRequest):
         for e in vlm_result.get("evidences", [])
     ]
 
+    # Cache response in memory LRU cache
+    cache_manager.query_cache.put(
+        doc_id=req.document_id,
+        query_text=req.query_text,
+        top_k=req.top_k_pages,
+        mode=req.inference_mode,
+        response_data={
+            "answer": vlm_result.get("answer", "Chưa có câu trả lời."),
+            "evidences": evidences,
+            "retrieved_page_numbers": candidate_pages,
+            "engine_used": vlm_result.get("engine", "unknown"),
+        },
+    )
+
     duration_ms = (time.time() - start_time) * 1000.0
 
     return QueryResponse(
@@ -300,7 +344,28 @@ async def query_financial_document(req: QueryRequest):
         retrieved_page_numbers=candidate_pages,
         engine_used=vlm_result.get("engine", "unknown"),
         latency_ms=round(duration_ms, 2),
+        cached=False,
     )
+
+
+@app.get("/api/v1/cache/stats", response_model=CacheStatsResponse)
+def get_cache_statistics():
+    """Returns comprehensive cache metrics across memory query cache and disk render cache."""
+    stats = cache_manager.get_stats()
+    return CacheStatsResponse(**stats)
+
+
+@app.post("/api/v1/cache/clear")
+def clear_application_cache(req: Optional[CacheClearRequest] = None):
+    """Clears query memory cache and/or disk rendered page cache."""
+    scope = req.scope if req else "all"
+    doc_id = req.document_id if req else None
+    try:
+        res = cache_manager.clear(scope=scope, document_id=doc_id)
+        retriever.store.clear_memory_cache()
+        return res
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 
 if __name__ == "__main__":

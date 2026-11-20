@@ -151,11 +151,14 @@
 
 ---
 
-## Sprint 5 Post-Mortem
-- **WebSocket Connectivity**: Frontend `VITE_WS_BRIDGE_PORT` must exactly match the backend port configured for the `core-engine`. Explicitly defined the `/ws` endpoint in FastAPI and updated client to connect to `ws://localhost:8765/ws` to resolve 403 errors and connection failures.
-- **Environment Management**: Python dependencies in `core-engine` must be managed via `venv` (`python3 -m venv venv`) to avoid conflicts with system/Homebrew Python installations on macOS and ensure reproducible environments.
+## Lesson 14: Tối ưu hóa xử lý BCTC quy mô lớn: Render đa luồng PyMuPDF, Bộ nhớ đệm Manifest và Phòng thủ Traversal trong Cache Invalidation
+- **Bối cảnh:** Khi xử lý các báo cáo tài chính kiểm toán dày từ 50 đến 100 trang, việc rasterize từng trang một tuần tự bằng PyMuPDF tốn rất nhiều thời gian. Đồng thời, việc tính toán lại visual patches và suy luận VLM cho các câu hỏi lặp lại trên cùng một tài liệu làm tăng độ trễ và tiêu tốn token không cần thiết.
+- **Nguyên nhân & Cạm bẫy:**
+  1. *Khóa luồng C / GIL:* Mặc dù PyMuPDF giải phóng GIL trong các thao tác nặng của C, nếu nhiều luồng dùng chung một đối tượng `doc = pymupdf.open()`, tài nguyên có thể bị nghẽn hoặc crash. Cần mở độc lập một document handle cho mỗi luồng xử lý (`_render_single_page_worker`) để bảo đảm an toàn đa luồng 100%.
+  2. *Lỗ hổng Traversal trong Subdirectory Cache Clear:* Hàm kiểm tra an toàn đường dẫn chung `is_path_safe()` chỉ đối chiếu với danh sách gốc `ALLOWED_ROOTS` (ví dụ `~/.finsight`). Nếu thư mục xóa cache là thư mục con `~/.finsight/cache/rendered_pages`, tham số `document_id="../../lancedb"` vẫn nằm trong `ALLOWED_ROOTS` và vượt qua kiểm tra, cho phép xóa trắng cơ sở dữ liệu vector! Cần bắt buộc bổ sung ràng buộc quan hệ cha-con trực tiếp: `target_dir.parent == self.render_cache_dir` và lọc ký tự `document_id` qua regex `^[a-zA-Z0-9_\-]+$`.
+- **Giải pháp chuẩn hóa:**
+  - Áp dụng `concurrent.futures.ThreadPoolExecutor` với số luồng tối ưu `min(cpu_count, 8)`, mở document độc lập trên mỗi worker.
+  - Sử dụng bộ nhớ đệm `manifest.json` ghi atomic qua file tạm `.tmp` để kiểm tra `file_size`, `file_mtime`, `dpi`. Khi cache hợp lệ, trả về kết quả trong `< 15ms` mà không cần rasterize lại.
+  - Thêm `QueryLRUCache` bộ nhớ đệm trong RAM với khóa `(doc_id, query, top_k, mode)` bọc bởi `threading.RLock()`, đưa độ trễ của các truy vấn lặp lại xuống mức tức thì `< 1ms` (thực nghiệm `0.05ms - 0.58ms`).
+  - Đóng dấu cờ `cached: bool` trên API và hiển thị huy hiệu `Cache` màu ngọc lục bảo (emerald) tinh tế trên giao diện máy tính.
 
-- **Excel Add-in Requirements**: Office Add-ins strictly require HTTPS for local development. Vite configuration must enable SSL, and `Office.onReady()` is mandatory for React-based startup.
-- **Build Configuration**: Multi-entry build configuration in Vite (for `taskpane` and `functions`) is robust but requires meticulous `rollupOptions` management for manifest compatibility.
-- **Interop Security**: WebSocket IPC bridge requires environment-specific URL configuration (avoid hardcoding) and robust input/structure validation (`isValidCitationEvent`) to prevent arbitrary injection.
-- **Clean Code Standards**: Strict adherence to Rule 14B (no commented-out code, no `console.log` in production) is verified by independent audits; manual cleanup of scaffold comments is necessary.

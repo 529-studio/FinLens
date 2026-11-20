@@ -8,7 +8,7 @@ export interface CitationEvent {
 class InteropBridge {
   private socket: WebSocket | null = null;
   // Use environment variable or fallback to default
-  private url = import.meta.env.VITE_BRIDGE_URL || 'ws://localhost:8080';
+  private url = import.meta.env.VITE_BRIDGE_URL || 'ws://127.0.0.1:8765/ws';
 
   connect() {
     this.socket = new WebSocket(this.url);

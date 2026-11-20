@@ -293,4 +293,15 @@ def test_query_with_cloud_inference_mode():
     assert 0 <= bbox["xmin"] < bbox["xmax"] <= 1000
 
 
+def test_websocket_broadcast_interop():
+    """Verify that WebSocket broadcast relays citation jump events between peer clients."""
+    with client.websocket_connect("/ws") as ws1:
+        with client.websocket_connect("/ws") as ws2:
+            payload = '{"type":"JUMP_TO_SOURCE","citationId":"test-citation-123"}'
+            ws1.send_text(payload)
+            received = ws2.receive_text()
+            assert received == payload
+
+
+
 

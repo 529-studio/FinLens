@@ -14,10 +14,7 @@ const isValidCitationEvent = (data: any): data is { type: 'JUMP_TO_SOURCE'; cita
 
 export const useBridgeServer = (onCitationJump: (citationId: string) => void) => {
   useEffect(() => {
-    const rawPort = import.meta.env.VITE_WS_BRIDGE_PORT;
-    if (!rawPort) {
-      throw new Error('VITE_WS_BRIDGE_PORT is not defined in environment variables.');
-    }
+    const rawPort = import.meta.env.VITE_WS_BRIDGE_PORT || '8765';
     const port = parseInt(rawPort, 10);
     
     if (isNaN(port)) {

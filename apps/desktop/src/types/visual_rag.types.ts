@@ -33,6 +33,7 @@ export interface QueryResponseDTO {
   retrieved_page_numbers: number[];
   engine_used: string;
   latency_ms: number;
+  cached?: boolean;
 }
 
 export interface DocumentIngestResponseDTO {
@@ -41,6 +42,7 @@ export interface DocumentIngestResponseDTO {
   rendered_image_paths: string[];
   indexed_vectors_count: number;
   duration_ms: number;
+  from_cache?: boolean;
 }
 
 export type UIState = 'idle' | 'loading' | 'success' | 'error';

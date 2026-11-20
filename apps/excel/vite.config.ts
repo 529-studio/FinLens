@@ -5,7 +5,11 @@ export default defineConfig({
   plugins: [react()],
   server: {
     port: 3000,
-    https: true,
+    https: process.env.HTTPS === 'true',
+  },
+  preview: {
+    port: 3333,
+    https: false,
   },
   build: {
     rollupOptions: {

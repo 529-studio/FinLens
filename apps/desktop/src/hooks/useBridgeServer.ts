@@ -1,3 +1,4 @@
+/// <reference types="vite/client" />
 import { useEffect } from 'react';
 
 // Basic security validation

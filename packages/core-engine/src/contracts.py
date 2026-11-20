@@ -164,6 +164,16 @@ class CacheClearRequest(BaseModel):
     scope: Literal["all", "queries", "documents"] = Field("all", description="Cache clearing scope")
     document_id: Optional[str] = Field(None, description="Optional document ID to clear specific document cache")
 
+    @field_validator("document_id")
+    @classmethod
+    def sanitize_doc_id(cls, v: Optional[str]):
+        if v is not None:
+            if not re.match(r"^[a-zA-Z0-9_\-]+$", v):
+                raise ValueError("document_id must be strictly alphanumeric (letters, digits, _, -)")
+            if len(v) > 64:
+                raise ValueError("document_id must not exceed 64 characters")
+        return v
+
 
 class ModelStatusResponse(BaseModel):
     """Status payload for local Apple Silicon MLX VLM engine."""

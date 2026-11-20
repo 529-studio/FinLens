@@ -360,9 +360,12 @@ def clear_application_cache(req: Optional[CacheClearRequest] = None):
     """Clears query memory cache and/or disk rendered page cache."""
     scope = req.scope if req else "all"
     doc_id = req.document_id if req else None
-    res = cache_manager.clear(scope=scope, document_id=doc_id)
-    retriever.store.clear_memory_cache()
-    return res
+    try:
+        res = cache_manager.clear(scope=scope, document_id=doc_id)
+        retriever.store.clear_memory_cache()
+        return res
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 
 if __name__ == "__main__":

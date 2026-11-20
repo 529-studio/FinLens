@@ -9,6 +9,7 @@ Provides:
 """
 
 import os
+import re
 import shutil
 import logging
 import threading
@@ -137,8 +138,12 @@ class CacheManager:
     def clear(self, scope: str = "all", document_id: Optional[str] = None) -> Dict[str, Any]:
         """
         Clears cache based on scope ('all', 'queries', 'documents').
-        Guarded by Path Traversal security validation.
+        Guarded by strict Path Traversal and direct-child containment validation.
         """
+        if document_id:
+            if not re.match(r"^[a-zA-Z0-9_\-]+$", document_id) or len(document_id) > 64:
+                raise ValueError(f"Access denied: document_id '{document_id}' contains unsafe characters")
+
         cleared_queries = 0
         cleared_docs = 0
 
@@ -151,7 +156,9 @@ class CacheManager:
 
         if scope in ("all", "documents"):
             if document_id:
-                target_dir = self.render_cache_dir / document_id
+                target_dir = (self.render_cache_dir / document_id).resolve()
+                if target_dir.parent != self.render_cache_dir:
+                    raise ValueError(f"Access denied: document_id '{document_id}' escapes cache directory")
                 if is_path_safe(str(target_dir)) and target_dir.exists():
                     shutil.rmtree(target_dir, ignore_errors=True)
                     cleared_docs = 1

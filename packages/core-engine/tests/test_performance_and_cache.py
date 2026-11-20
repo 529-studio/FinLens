@@ -242,3 +242,33 @@ def test_api_cache_endpoints_and_sub_millisecond_query():
     q_res3 = client.post("/api/v1/query", json=query_payload)
     assert q_res3.status_code == 200
     assert q_res3.json()["cached"] is False
+
+
+def test_cache_security_path_traversal_rejection(temp_cache_dir):
+    """
+    AGENTS.md Rule 13B: Backend Security & Injection Defense
+    Verifies that directory traversal sequences in cache clear and renderer are strictly rejected.
+    """
+    # 1. API endpoint rejects traversal via Pydantic validator (HTTP 422)
+    res_bad1 = client.post("/api/v1/cache/clear", json={"scope": "documents", "document_id": "../../victim"})
+    assert res_bad1.status_code == 422
+
+    res_bad2 = client.post("/api/v1/cache/clear", json={"scope": "documents", "document_id": "invalid/slash"})
+    assert res_bad2.status_code == 422
+
+    # 2. CacheManager.clear rejects traversal or escaping parent directly
+    cm = CacheManager(render_cache_dir=temp_cache_dir)
+    with pytest.raises(ValueError) as exc:
+        cm.clear(scope="documents", document_id="../../escape")
+    assert "unsafe characters" in str(exc.value) or "escapes" in str(exc.value)
+
+    # 3. PdfRenderer rejects traversal in render_document and is_cached
+    renderer = PdfRenderer(output_base_dir=temp_cache_dir)
+    with pytest.raises(ValueError) as exc:
+        renderer.render_document(SAMPLE_PDF, "../../escape")
+    assert "Invalid document identifier" in str(exc.value) or "escapes" in str(exc.value)
+
+    with pytest.raises(ValueError) as exc:
+        renderer.is_cached(SAMPLE_PDF, "../../escape")
+    assert "Invalid document identifier" in str(exc.value) or "escapes" in str(exc.value)
+

@@ -7,6 +7,7 @@ Governed by ADR-001, Sprint 1 Issue #3, Sprint 6 Issue #36, and 529 Engineering 
 """
 
 import os
+import re
 import json
 import hashlib
 import logging
@@ -96,13 +97,23 @@ class PdfRenderer:
             if tmp_file.exists():
                 tmp_file.unlink(missing_ok=True)
 
+    def _sanitize_doc_id(self, doc_id: str) -> str:
+        """Sanitizes document_id and strictly prevents path traversal escaping output_base_dir."""
+        if not doc_id or not re.match(r"^[a-zA-Z0-9_\-]+$", doc_id) or len(doc_id) > 64:
+            raise ValueError(f"Invalid document identifier: '{doc_id}' must be alphanumeric with '_' or '-' and <= 64 characters")
+        doc_dir = (self.output_base_dir / doc_id).resolve()
+        if doc_dir.parent != self.output_base_dir:
+            raise ValueError(f"Access denied: document_id '{doc_id}' escapes output base directory")
+        return doc_id
+
     def is_cached(self, pdf_path: str, document_id: str, dpi: int = 150) -> bool:
         """Checks if a valid, complete rendered cache exists on disk."""
+        clean_id = self._sanitize_doc_id(document_id)
         resolved_pdf = Path(os.path.expanduser(pdf_path)).resolve()
         if not resolved_pdf.exists():
             return False
 
-        doc_dir = self.output_base_dir / document_id
+        doc_dir = self.output_base_dir / clean_id
         manifest_file = doc_dir / "manifest.json"
         manifest = self._read_manifest(manifest_file)
         if not manifest:
@@ -136,6 +147,7 @@ class PdfRenderer:
         Uses parallel multi-core rendering and fast disk caching.
         Returns a list of tuples: (page_number, image_path, width_px, height_px).
         """
+        clean_id = self._sanitize_doc_id(document_id)
         resolved_pdf = Path(os.path.expanduser(pdf_path)).resolve()
         if not resolved_pdf.exists():
             raise FileNotFoundError(f"PDF file not found: {resolved_pdf}")
@@ -143,7 +155,7 @@ class PdfRenderer:
         if not is_path_safe(str(resolved_pdf)):
             raise ValueError(f"Access denied: PDF path '{resolved_pdf}' escapes authorized boundaries")
 
-        doc_dir = self.output_base_dir / document_id
+        doc_dir = self.output_base_dir / clean_id
         doc_dir.mkdir(parents=True, exist_ok=True)
         manifest_file = doc_dir / "manifest.json"
 

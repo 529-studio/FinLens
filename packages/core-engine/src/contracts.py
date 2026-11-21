@@ -76,6 +76,7 @@ class GroundedEvidence(BaseModel):
     label: str = Field(..., min_length=2, max_length=150, description="Human-readable label")
     extracted_value: Optional[str] = Field(None, max_length=100, description="Exact numerical value or text extracted")
     confidence: float = Field(..., ge=0.0, le=1.0, description="Confidence score of visual grounding")
+    document_id: Optional[str] = Field(None, description="Document identifier linking evidence to specific PDF")
 
 
 class DocumentIngestRequest(BaseModel):
@@ -146,6 +147,53 @@ class QueryResponse(BaseModel):
     engine_used: str = Field(..., description="e.g. 'mlx-qwen2.5-vl-7b-4bit' or 'claude-3-5-sonnet'")
     latency_ms: float
     cached: bool = Field(False, description="Whether query response was retrieved from in-memory LRU cache")
+
+
+class ComparativeQueryRequest(BaseModel):
+    """User comparative query payload across multiple fiscal documents."""
+    document_ids: List[str] = Field(..., min_length=2, max_length=5, description="List of 2 to 5 document identifiers to compare")
+    query_text: str = Field(..., min_length=2, max_length=1000, description="Comparative financial analyst question")
+    top_k_per_doc: int = Field(1, ge=1, le=5, description="Number of candidate pages to retrieve per document")
+    inference_mode: Literal["auto", "local", "cloud"] = Field("auto", description="Dual-mode inference strategy")
+
+    @field_validator("document_ids")
+    @classmethod
+    def validate_doc_ids(cls, ids: List[str]):
+        if len(ids) < 2:
+            raise ValueError("document_ids must contain at least 2 distinct document identifiers for comparison")
+        if len(ids) > 5:
+            raise ValueError("document_ids must not exceed 5 documents per comparative query")
+        seen = set()
+        for doc_id in ids:
+            if not doc_id or not re.match(r"^[a-zA-Z0-9_\-]+$", doc_id):
+                raise ValueError(f"document_id '{doc_id}' must be strictly alphanumeric (letters, digits, _, -)")
+            if len(doc_id) > 64:
+                raise ValueError(f"document_id '{doc_id}' must not exceed 64 characters")
+            if doc_id in seen:
+                raise ValueError(f"Duplicate document_id '{doc_id}' in comparison list")
+            seen.add(doc_id)
+        return ids
+
+    @field_validator("query_text")
+    @classmethod
+    def sanitize_query(cls, v: str):
+        cleaned = v.replace("\0", "").strip()
+        if not cleaned:
+            raise ValueError("query_text cannot be empty after trimming")
+        return cleaned
+
+
+class ComparativeQueryResponse(BaseModel):
+    """Response payload containing YoY comparison, delta metrics, and multi-document visual grounding."""
+    document_ids: List[str]
+    query_text: str
+    answer: str
+    comparative_metrics: List[Dict[str, Any]] = Field(default_factory=list, description="Extracted YoY comparison metrics")
+    evidences: List[GroundedEvidence]
+    retrieved_pages: Dict[str, List[int]]
+    engine_used: str
+    latency_ms: float
+
 
 
 class CacheStatsResponse(BaseModel):

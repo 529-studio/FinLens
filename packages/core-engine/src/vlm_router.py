@@ -56,6 +56,27 @@ class VlmRouter:
         else:
             return await self.cloud_router.analyze_pages(pages, query)
 
+    async def analyze_comparative(
+        self,
+        doc_pages: Dict[str, List[Tuple[str, int]]],
+        query: str,
+        preferred_mode: str = "auto",
+    ) -> Dict[str, Any]:
+        """
+        Dispatches multi-document comparative visual analysis to either Local MLX or Cloud Provider.
+        """
+        mode = preferred_mode if preferred_mode != "auto" else self.default_mode
+
+        if mode == "auto":
+            hw = self.detect_hardware_capability()
+            mode = "local" if hw == "mlx_apple_silicon" else "cloud"
+
+        if mode == "local":
+            return self.mlx_engine.analyze_comparative(doc_pages, query)
+        else:
+            return await self.cloud_router.analyze_comparative(doc_pages, query)
+
+
     async def analyze_page(
         self,
         image_path: str,

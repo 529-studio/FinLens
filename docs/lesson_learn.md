@@ -180,4 +180,16 @@
     - `src/lib/hooks/use-ingest.ts` (TanStack Query mutation)
     - `src/components/DocumentUploader.tsx` & `Sidebar.tsx` (Xử lý trọn vẹn 3 trạng thái UI, Kiosk touch target $\ge 48\text{px}$, 100% SVG Lucide React, 0 raw emoji).
 
+### Bài học 17: Multi-Document Comparative Visual RAG & Phân Vùng Chỉ Mục Đa BCTC Theo Năm
+- **Bối cảnh & Thách thức:**
+  1. *Lỗ hổng Path Traversal & Injection trong mảng danh sách tài liệu:* Khi người dùng gửi danh sách nhiều `document_ids` để so sánh đa năm (YoY), kẻ tấn công có thể chèn các chuỗi thoát thư mục như `../../etc/passwd` hoặc ký tự lệnh shell trong bất kỳ phần tử nào của mảng `document_ids`.
+  2. *Trộn lẫn không gian vector (Vector Cross-Contamination):* Khi truy vấn đồng thời nhiều BCTC (ví dụ 2022 và 2023), nếu gom chung vào một không gian vector mà không phân tách rõ ràng theo `document_id`, các trang tài liệu có độ tương đồng văn bản cao của một năm có thể lấn át năm còn lại, làm sai lệch phân tích đối chiếu tăng trưởng.
+  3. *Mất liên kết chứng cứ thị giác (Visual Grounding Loss):* Trong truy vấn đơn lẻ, `GroundedEvidence` chỉ cần chứa `page_number` và `bounding_box`. Khi so sánh đa tài liệu, nếu thiếu trường `document_id`, giao diện PDF viewer không thể xác định cần mở tệp PDF nào tương ứng với bounding box khi người dùng click vào bằng chứng trích dẫn.
+- **Giải pháp chuẩn hóa (Sprint 7 - Task S7-02):**
+  - *Bảo mật hợp đồng Pydantic:* Bổ sung `ComparativeQueryRequest` với bộ xác thực regex `^[a-zA-Z0-9_\-]+$` áp dụng cho từng phần tử `document_id`, giới hạn độ dài $\le 64$, số lượng từ 2 đến 5 tài liệu, và kiểm tra loại trừ trùng lặp (`Duplicate document_id in comparison list`).
+  - *Truy xuất phân vùng độc lập (Partitioned Multi-Index Retrieval):* Triển khai hàm `comparative_search(document_ids, query, top_k_per_doc)` trong `retriever.py`, truy vấn riêng rẽ từng chỉ mục LanceDB của từng tài liệu để đảm bảo tỷ lệ trang đối chiếu cân bằng giữa các kỳ tài chính.
+  - *Gán nhãn định danh tài liệu vào GroundedEvidence:* Bổ sung trường `document_id: Optional[str]` vào hợp đồng `GroundedEvidence` (cả Python Core Engine lẫn TypeScript DTOs), cho phép UI định tuyến chuyển đổi tài liệu và hiển thị badge `[VNM_2022]` rõ ràng trên từng chip trích dẫn.
+  - *Giao diện đối chiếu YoY công thái học:* Thiết kế bảng thẻ số liệu delta (YoY Metric Delta Cards) hiển thị tỷ lệ tăng trưởng và chỉ báo xu hướng (`up`, `down`, `neutral`), đảm bảo toàn bộ nút bấm đáp ứng chuẩn Kiosk $\ge 48\text{px}$ và 100% SVG vector Lucide React.
+
+
 

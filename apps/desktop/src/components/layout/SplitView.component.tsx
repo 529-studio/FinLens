@@ -3,6 +3,7 @@
  * Governed by 529 Engineering Standards:
  * - 3 States: Skeleton, Error with Retry, Empty State with Action
  * - Kiosk Ergonomics: >= 48px interactive target size
+ * - Multi-Document Comparative Visual RAG (Sprint 7 Task S7-02)
  */
 
 import { useState, type FormEvent, type FC } from 'react';
@@ -13,19 +14,22 @@ import { ResizableSplitView } from './ResizableSplitView';
 import { BoundingBoxOverlay } from '../pdf/BoundingBoxOverlay';
 import { PdfViewer } from '../pdf/PdfViewer';
 import { SettingsDialog } from '../settings/SettingsDialog';
-import { 
-  FileText, 
-  Send, 
-  RefreshCw, 
-  AlertCircle, 
-  Eye, 
+import {
+  FileText,
+  Send,
+  RefreshCw,
+  AlertCircle,
+  Eye,
   Sparkles,
   ExternalLink,
   ZoomIn,
   ZoomOut,
   BarChart3,
   PieChart,
-  Settings
+  Settings,
+  GitCompare,
+  TrendingUp,
+  Layers,
 } from 'lucide-react';
 
 interface SplitViewProps {
@@ -37,15 +41,30 @@ export const SplitView: FC<SplitViewProps> = ({ documentId, documentTitle }) => 
   const [inputText, setInputText] = useState('');
   const [zoomLevel, setZoomLevel] = useState<number>(1.0);
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
-  const { state, error, history, activeEvidence, ask, focusEvidence, clearError } = useVisualRag(documentId);
+  const [modeTab, setModeTab] = useState<'single' | 'comparative'>('single');
+  const [selectedDocIds] = useState<string[]>(['VNM_2022_COMP', 'VNM_2023_COMP']);
+
+  const {
+    state,
+    error,
+    history,
+    comparativeHistory,
+    activeEvidence,
+    ask,
+    askComparative,
+    focusEvidence,
+    clearError,
+  } = useVisualRag(documentId);
+
   const { inferenceMode } = useSettings();
 
   useBridgeServer((citationId) => {
     console.log(`Navigation requested for citation: ${citationId}`);
-    // Assume evidence has an ID or we can map citationId to evidence
-    // Based on the history structure, we need a reliable way to map ID
-    const allEvidences = history.flatMap(h => h.evidences);
-    const evidence = allEvidences.find(e => e.label === citationId); // Simplified lookup
+    const allEvidences = [
+      ...history.flatMap((h) => h.evidences),
+      ...comparativeHistory.flatMap((c) => c.evidences),
+    ];
+    const evidence = allEvidences.find((e) => e.label === citationId);
     if (evidence) {
       focusEvidence(evidence);
     }
@@ -54,7 +73,12 @@ export const SplitView: FC<SplitViewProps> = ({ documentId, documentTitle }) => 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
     if (!inputText.trim()) return;
-    ask(inputText, inferenceMode);
+
+    if (modeTab === 'comparative') {
+      askComparative(selectedDocIds, inputText, inferenceMode);
+    } else {
+      ask(inputText, inferenceMode);
+    }
     setInputText('');
   };
 
@@ -67,14 +91,18 @@ export const SplitView: FC<SplitViewProps> = ({ documentId, documentTitle }) => 
       <header className="h-14 border-b border-slate-800 px-4 flex items-center justify-between gap-2 flex-shrink-0">
         <div className="flex items-center space-x-2 min-w-0">
           <FileText className="w-5 h-5 text-indigo-400 flex-shrink-0" />
-          <span className="font-semibold text-sm truncate max-w-[200px] 2xl:max-w-md">{documentTitle}</span>
+          <span className="font-semibold text-sm truncate max-w-[200px] 2xl:max-w-md">
+            {activeEvidence?.document_id ? `${activeEvidence.document_id} (Trích dẫn)` : documentTitle}
+          </span>
         </div>
 
         <div className="flex items-center space-x-3 flex-shrink-0">
           {activeEvidence && (
             <div className="hidden sm:flex items-center space-x-2 bg-indigo-950/70 border border-indigo-700/50 px-2.5 py-1 rounded text-xs text-indigo-300 truncate max-w-xs">
               <Eye className="w-3.5 h-3.5 text-indigo-400 flex-shrink-0" />
-              <span className="truncate">Trang {activeEvidence.page_number}: {activeEvidence.label}</span>
+              <span className="truncate">
+                {activeEvidence.document_id ? `[${activeEvidence.document_id}] ` : ''}Trang {activeEvidence.page_number}: {activeEvidence.label}
+              </span>
             </div>
           )}
 
@@ -111,14 +139,12 @@ export const SplitView: FC<SplitViewProps> = ({ documentId, documentTitle }) => 
       </header>
 
       <div className="flex-1 relative overflow-auto p-6 flex justify-center items-start sm:items-center bg-slate-950/50">
-        {/* Simulated PDF Page Viewport with Scale Tracking */}
         <div className="relative shadow-2xl overflow-hidden flex-shrink-0 my-auto">
           <PdfViewer
-            documentId={documentId}
+            documentId={activeEvidence?.document_id || documentId}
             pageNumber={activeEvidence?.page_number || 1}
             zoomLevel={zoomLevel}
           />
-          {/* Visual Grounding Bounding Box Overlay with zoom scale */}
           <BoundingBoxOverlay
             evidence={activeEvidence}
             renderedWidth={500}
@@ -142,8 +168,8 @@ export const SplitView: FC<SplitViewProps> = ({ documentId, documentTitle }) => 
             type="button"
             onClick={() => setIsSettingsOpen(true)}
             className="p-2 hover:bg-slate-800 text-slate-400 hover:text-slate-200 rounded-lg transition"
-            title="Cài đặt hệ thống & BYOK"
-            aria-label="Cài đặt hệ thống"
+            title="Cài đặt mô hình AI"
+            aria-label="Cài đặt mô hình AI"
           >
             <Settings className="w-4 h-4" />
           </button>
@@ -153,104 +179,320 @@ export const SplitView: FC<SplitViewProps> = ({ documentId, documentTitle }) => 
         </div>
       </header>
 
+      {/* Mode Selector Tabs (Single vs Comparative YoY) */}
+      <div className="flex border-b border-slate-800 bg-slate-900/80 px-4 py-2 gap-2 flex-shrink-0">
+        <button
+          type="button"
+          data-testid="tab-single-query"
+          onClick={() => setModeTab('single')}
+          className={`min-h-[48px] px-3.5 py-2 rounded-lg text-xs font-semibold flex items-center gap-2 transition ${
+            modeTab === 'single'
+              ? 'bg-indigo-600 text-white shadow-sm'
+              : 'bg-slate-800/80 text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+          }`}
+        >
+          <FileText className="w-4 h-4" />
+          <span>Truy vấn đơn lẻ</span>
+        </button>
+        <button
+          type="button"
+          data-testid="tab-comparative-query"
+          onClick={() => setModeTab('comparative')}
+          className={`min-h-[48px] px-3.5 py-2 rounded-lg text-xs font-semibold flex items-center gap-2 transition ${
+            modeTab === 'comparative'
+              ? 'bg-indigo-600 text-white shadow-sm'
+              : 'bg-slate-800/80 text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+          }`}
+        >
+          <GitCompare className="w-4 h-4" />
+          <span>So sánh đa BCTC (YoY)</span>
+        </button>
+      </div>
+
+      {/* Comparative Document Selection Chips (When in Comparative mode) */}
+      {modeTab === 'comparative' && (
+        <div className="bg-slate-950/60 border-b border-slate-800/80 px-4 py-2.5 flex items-center justify-between gap-2 flex-shrink-0">
+          <div className="flex items-center gap-2 overflow-x-auto text-xs">
+            <span className="text-slate-400 font-medium text-[11px] uppercase tracking-wider shrink-0">
+              Đối chiếu:
+            </span>
+            {selectedDocIds.map((id, i) => (
+              <span
+                key={id}
+                className={`px-2.5 py-1 rounded-full text-[11px] font-mono border flex items-center gap-1 shrink-0 ${
+                  i === 0
+                    ? 'bg-sky-950/80 text-sky-300 border-sky-700/60'
+                    : 'bg-indigo-950/80 text-indigo-300 border-indigo-700/60'
+                }`}
+              >
+                <Layers className="w-3 h-3" />
+                {id}
+              </span>
+            ))}
+          </div>
+          <span className="text-[10px] text-emerald-400 font-medium bg-emerald-950/60 border border-emerald-800/60 px-2 py-0.5 rounded-full shrink-0">
+            2 Tài liệu
+          </span>
+        </div>
+      )}
+
       {/* Message Thread Area with 3 UI States */}
       <div className="flex-1 overflow-y-auto p-6 space-y-4">
         {/* STATE 1: EMPTY STATE */}
-        {history.length === 0 && state !== 'loading' && state !== 'error' && (
-          <div className="h-full flex flex-col items-center justify-center text-center p-8 space-y-4 text-slate-400">
-            <div className="w-16 h-16 rounded-full bg-indigo-950/80 border border-indigo-700/40 flex items-center justify-center text-indigo-400">
-              <FileText className="w-8 h-8" />
-            </div>
-            <div className="space-y-1">
-              <h3 className="text-base font-semibold text-slate-200">Sẵn sàng phân tích Báo cáo tài chính</h3>
-              <p className="text-xs max-w-sm">
-                Đặt câu hỏi về bất kỳ biểu đồ tăng trưởng, biên lợi nhuận, hoặc bảng số liệu phức tạp trong tài liệu.
-              </p>
-            </div>
-            <div className="flex flex-col gap-2 w-full max-w-sm pt-2">
-              <button
-                onClick={() => ask('Biên lợi nhuận gộp qua biểu đồ các năm thay đổi như thế nào?')}
-                className="min-h-[48px] px-4 py-2 bg-slate-800 hover:bg-slate-700 text-xs rounded border border-slate-700 text-left transition flex items-center space-x-2.5"
-              >
-                <BarChart3 className="w-4 h-4 text-indigo-400 flex-shrink-0" />
-                <span>Phân tích biên lợi nhuận gộp qua biểu đồ</span>
-              </button>
-              <button
-                onClick={() => ask('Cơ cấu doanh thu theo mảng kinh doanh năm 2023?')}
-                className="min-h-[48px] px-4 py-2 bg-slate-800 hover:bg-slate-700 text-xs rounded border border-slate-700 text-left transition flex items-center space-x-2.5"
-              >
-                <PieChart className="w-4 h-4 text-emerald-400 flex-shrink-0" />
-                <span>Cơ cấu doanh thu theo từng mảng</span>
-              </button>
-            </div>
-          </div>
-        )}
+        {((modeTab === 'single' && history.length === 0) ||
+          (modeTab === 'comparative' && comparativeHistory.length === 0)) &&
+          state !== 'loading' &&
+          state !== 'error' && (
+            <div className="h-full flex flex-col items-center justify-center text-center p-8 space-y-4 text-slate-400">
+              <div className="w-16 h-16 rounded-full bg-indigo-950/80 border border-indigo-700/40 flex items-center justify-center text-indigo-400">
+                {modeTab === 'comparative' ? (
+                  <GitCompare className="w-8 h-8" />
+                ) : (
+                  <FileText className="w-8 h-8" />
+                )}
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-base font-semibold text-slate-200">
+                  {modeTab === 'comparative'
+                    ? 'Chế độ so sánh đa kỳ BCTC (YoY)'
+                    : 'Sẵn sàng phân tích Báo cáo tài chính'}
+                </h3>
+                <p className="text-xs max-w-sm">
+                  {modeTab === 'comparative'
+                    ? 'Đối chiếu số liệu, doanh thu, lợi nhuận và biên lãi gộp giữa nhiều năm tài chính cùng lúc.'
+                    : 'Đặt câu hỏi về bất kỳ biểu đồ tăng trưởng, biên lợi nhuận, hoặc bảng số liệu phức tạp trong tài liệu.'}
+                </p>
+              </div>
 
-        {/* Chat History List */}
-        {history.map((msg, idx) => (
-          <div key={idx} className="space-y-3">
-            <div className="flex justify-end">
-              <div className="bg-indigo-600 text-white text-sm px-4 py-2.5 rounded-2xl rounded-tr-none max-w-xl 2xl:max-w-2xl shadow">
-                {msg.query_text}
+              <div className="flex flex-col gap-2 w-full max-w-sm pt-2">
+                {modeTab === 'comparative' ? (
+                  <>
+                    <button
+                      type="button"
+                      data-testid="btn-suggest-comparative-1"
+                      onClick={() =>
+                        askComparative(
+                          selectedDocIds,
+                          'So sánh cơ cấu doanh thu nội địa và xuất khẩu giữa hai năm tài chính',
+                          inferenceMode
+                        )
+                      }
+                      className="min-h-[48px] px-4 py-2 bg-slate-800 hover:bg-slate-700 text-xs rounded border border-slate-700 text-left transition flex items-center space-x-2.5"
+                    >
+                      <TrendingUp className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                      <span>So sánh cơ cấu doanh thu & tăng trưởng 2 năm</span>
+                    </button>
+                    <button
+                      type="button"
+                      data-testid="btn-suggest-comparative-2"
+                      onClick={() =>
+                        askComparative(
+                          selectedDocIds,
+                          'Đối chiếu tổng tài sản và số dư tiền mặt giữa hai kỳ BCTC',
+                          inferenceMode
+                        )
+                      }
+                      className="min-h-[48px] px-4 py-2 bg-slate-800 hover:bg-slate-700 text-xs rounded border border-slate-700 text-left transition flex items-center space-x-2.5"
+                    >
+                      <BarChart3 className="w-4 h-4 text-indigo-400 flex-shrink-0" />
+                      <span>Đối chiếu số dư tiền mặt & tổng tài sản</span>
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => ask('Biên lợi nhuận gộp qua biểu đồ các năm thay đổi như thế nào?')}
+                      className="min-h-[48px] px-4 py-2 bg-slate-800 hover:bg-slate-700 text-xs rounded border border-slate-700 text-left transition flex items-center space-x-2.5"
+                    >
+                      <BarChart3 className="w-4 h-4 text-indigo-400 flex-shrink-0" />
+                      <span>Phân tích biên lợi nhuận gộp qua biểu đồ</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => ask('Cơ cấu doanh thu theo mảng kinh doanh năm 2023?')}
+                      className="min-h-[48px] px-4 py-2 bg-slate-800 hover:bg-slate-700 text-xs rounded border border-slate-700 text-left transition flex items-center space-x-2.5"
+                    >
+                      <PieChart className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                      <span>Cơ cấu doanh thu theo từng mảng</span>
+                    </button>
+                  </>
+                )}
               </div>
             </div>
+          )}
 
-            <div className="flex justify-start">
-              <div className="bg-slate-800/90 border border-slate-700 text-slate-200 text-sm p-4 rounded-2xl rounded-tl-none max-w-2xl 2xl:max-w-4xl space-y-3 shadow-lg">
-                <p className="leading-relaxed whitespace-pre-wrap">{msg.answer}</p>
+        {/* SINGLE MODE HISTORY */}
+        {modeTab === 'single' &&
+          history.map((msg, idx) => (
+            <div key={idx} className="space-y-3">
+              <div className="flex justify-end">
+                <div className="bg-indigo-600 text-white text-sm px-4 py-2.5 rounded-2xl rounded-tr-none max-w-xl 2xl:max-w-2xl shadow">
+                  {msg.query_text}
+                </div>
+              </div>
 
-                {/* Audit Trail Evidence Chips */}
-                {msg.evidences.length > 0 && (
-                  <div className="pt-2 border-t border-slate-700/80">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">
-                        Bằng chứng kiểm toán (Visual Grounding):
-                      </span>
-                      {new Set(msg.evidences.map((e) => e.page_number)).size > 1 && (
-                        <span className="text-[10px] font-medium bg-indigo-900/60 border border-indigo-700/60 text-indigo-300 px-2 py-0.5 rounded-full">
-                          Liên kết đa trang ({new Set(msg.evidences.map((e) => e.page_number)).size} trang)
+              <div className="flex justify-start">
+                <div className="bg-slate-800/90 border border-slate-700 text-slate-200 text-sm p-4 rounded-2xl rounded-tl-none max-w-2xl 2xl:max-w-4xl space-y-3 shadow-lg">
+                  <p className="leading-relaxed whitespace-pre-wrap">{msg.answer}</p>
+
+                  {/* Audit Trail Evidence Chips */}
+                  {msg.evidences.length > 0 && (
+                    <div className="pt-2 border-t border-slate-700/80">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">
+                          Bằng chứng kiểm toán (Visual Grounding):
+                        </span>
+                        {new Set(msg.evidences.map((e) => e.page_number)).size > 1 && (
+                          <span className="text-[10px] font-medium bg-indigo-900/60 border border-indigo-700/60 text-indigo-300 px-2 py-0.5 rounded-full">
+                            Liên kết đa trang ({new Set(msg.evidences.map((e) => e.page_number)).size} trang)
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {msg.evidences.map((ev, evIdx) => {
+                          const isActive =
+                            activeEvidence?.page_number === ev.page_number &&
+                            activeEvidence?.label === ev.label;
+                          return (
+                            <button
+                              key={evIdx}
+                              onClick={() => focusEvidence(ev)}
+                              className={`min-h-[48px] px-3 py-1.5 border text-xs rounded-lg flex items-center space-x-2 transition cursor-pointer ${
+                                isActive
+                                  ? 'bg-red-800/80 border-red-500 text-white font-medium shadow-md'
+                                  : 'bg-red-950/60 hover:bg-red-900/60 border-red-700/60 text-red-300'
+                              }`}
+                            >
+                              <ExternalLink className="w-3.5 h-3.5 flex-shrink-0" />
+                              <span>P.{ev.page_number}: {ev.label}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="text-[10px] text-slate-400 flex justify-between items-center pt-1">
+                    <span>Engine: {msg.engine_used}</span>
+                    <span className="flex items-center space-x-1.5 font-mono">
+                      {msg.cached && (
+                        <span className="text-[9px] text-emerald-400 bg-emerald-950/70 border border-emerald-800/60 px-1.5 py-0.5 rounded uppercase tracking-wider font-semibold">
+                          Cache
                         </span>
                       )}
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      {msg.evidences.map((ev, evIdx) => {
-                        const isActive =
-                          activeEvidence?.page_number === ev.page_number &&
-                          activeEvidence?.label === ev.label;
-                        return (
-                          <button
-                            key={evIdx}
-                            onClick={() => focusEvidence(ev)}
-                            className={`min-h-[48px] px-3 py-1.5 border text-xs rounded-lg flex items-center space-x-2 transition cursor-pointer ${
-                              isActive
-                                ? 'bg-red-800/80 border-red-500 text-white font-medium shadow-md'
-                                : 'bg-red-950/60 hover:bg-red-900/60 border-red-700/60 text-red-300'
-                            }`}
-                          >
-                            <ExternalLink className="w-3.5 h-3.5 flex-shrink-0" />
-                            <span>P.{ev.page_number}: {ev.label}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
+                      <span>{msg.latency_ms} ms</span>
+                    </span>
                   </div>
-                )}
-
-                <div className="text-[10px] text-slate-400 flex justify-between items-center pt-1">
-                  <span>Engine: {msg.engine_used}</span>
-                  <span className="flex items-center space-x-1.5 font-mono">
-                    {msg.cached && (
-                      <span className="text-[9px] text-emerald-400 bg-emerald-950/70 border border-emerald-800/60 px-1.5 py-0.5 rounded uppercase tracking-wider font-semibold">
-                        Cache
-                      </span>
-                    )}
-                    <span>{msg.latency_ms} ms</span>
-                  </span>
                 </div>
               </div>
             </div>
-          </div>
-        ))}
+          ))}
+
+        {/* COMPARATIVE MODE HISTORY */}
+        {modeTab === 'comparative' &&
+          comparativeHistory.map((msg, idx) => (
+            <div key={idx} className="space-y-3">
+              <div className="flex justify-end">
+                <div className="bg-indigo-600 text-white text-sm px-4 py-2.5 rounded-2xl rounded-tr-none max-w-xl 2xl:max-w-2xl shadow">
+                  {msg.query_text}
+                </div>
+              </div>
+
+              <div
+                data-testid="comparative-result-card"
+                className="flex justify-start"
+              >
+                <div className="bg-slate-800/90 border border-slate-700 text-slate-200 text-sm p-4 rounded-2xl rounded-tl-none max-w-2xl 2xl:max-w-4xl space-y-3.5 shadow-lg">
+                  {/* Header Badge */}
+                  <div className="flex items-center justify-between border-b border-slate-700/80 pb-2">
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-slate-100">
+                      <GitCompare className="w-4 h-4 text-indigo-400" />
+                      <span>Kết quả phân tích so sánh đa BCTC (YoY)</span>
+                    </div>
+                    <span className="text-[10px] font-mono text-emerald-400 bg-emerald-950/70 border border-emerald-800/60 px-2 py-0.5 rounded-full">
+                      {msg.document_ids.length} Kỳ đối chiếu
+                    </span>
+                  </div>
+
+                  {/* YoY Comparative Metrics Grid */}
+                  {msg.comparative_metrics && msg.comparative_metrics.length > 0 && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                      {msg.comparative_metrics.map((m, mIdx) => (
+                        <div
+                          key={mIdx}
+                          className="bg-slate-900/80 border border-slate-700/70 rounded-xl p-3 space-y-1.5"
+                        >
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="font-semibold text-slate-300">{m.metric}</span>
+                            {m.yoy_growth && (
+                              <span className="flex items-center gap-0.5 text-[11px] font-bold text-emerald-400 bg-emerald-950/60 px-1.5 py-0.5 rounded border border-emerald-800/60">
+                                <TrendingUp className="w-3 h-3" />
+                                {m.yoy_growth}
+                              </span>
+                            )}
+                          </div>
+                          <div className="grid grid-cols-2 gap-2 text-[11px] text-slate-400 pt-1 border-t border-slate-800">
+                            {Object.entries(m.doc_values).map(([docId, val]) => (
+                              <div key={docId} className="truncate">
+                                <span className="text-[10px] text-slate-400 block truncate">{docId}:</span>
+                                <strong className="text-slate-100">{String(val)}</strong>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Comparative Narrative Answer */}
+                  <p className="leading-relaxed whitespace-pre-wrap text-xs text-slate-200">
+                    {msg.answer}
+                  </p>
+
+                  {/* Dual-Document Grounding Citations */}
+                  {msg.evidences.length > 0 && (
+                    <div className="pt-2 border-t border-slate-700/80">
+                      <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block mb-2">
+                        Bằng chứng đối chiếu theo tài liệu (Visual Grounding):
+                      </span>
+                      <div className="flex flex-wrap gap-2">
+                        {msg.evidences.map((ev, evIdx) => {
+                          const isActive =
+                            activeEvidence?.page_number === ev.page_number &&
+                            activeEvidence?.label === ev.label;
+                          const isDocA = ev.document_id === msg.document_ids[0];
+                          return (
+                            <button
+                              key={evIdx}
+                              onClick={() => focusEvidence(ev)}
+                              className={`min-h-[48px] px-3 py-1.5 border text-xs rounded-lg flex items-center space-x-2 transition cursor-pointer ${
+                                isActive
+                                  ? 'bg-red-800/80 border-red-500 text-white font-medium shadow-md'
+                                  : isDocA
+                                  ? 'bg-sky-950/60 hover:bg-sky-900/60 border-sky-700/60 text-sky-300'
+                                  : 'bg-indigo-950/60 hover:bg-indigo-900/60 border-indigo-700/60 text-indigo-300'
+                              }`}
+                            >
+                              <ExternalLink className="w-3.5 h-3.5 flex-shrink-0" />
+                              <span>
+                                {ev.document_id ? `[${ev.document_id}] ` : ''}P.{ev.page_number}: {ev.label}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="text-[10px] text-slate-400 flex justify-between items-center pt-1 border-t border-slate-800/80">
+                    <span>Engine: {msg.engine_used}</span>
+                    <span className="font-mono">{msg.latency_ms} ms</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
 
         {/* STATE 2: SKELETON LOADING STATE */}
         {state === 'loading' && (
@@ -275,8 +517,14 @@ export const SplitView: FC<SplitViewProps> = ({ documentId, documentTitle }) => 
             <button
               onClick={() => {
                 clearError();
-                if (history.length > 0) {
-                  ask(history[history.length - 1].query_text);
+                if (modeTab === 'comparative' && comparativeHistory.length > 0) {
+                  askComparative(
+                    selectedDocIds,
+                    comparativeHistory[comparativeHistory.length - 1].query_text,
+                    inferenceMode
+                  );
+                } else if (history.length > 0) {
+                  ask(history[history.length - 1].query_text, inferenceMode);
                 }
               }}
               className="min-h-[48px] px-4 py-2 bg-red-800 hover:bg-red-700 text-white text-xs font-semibold rounded-lg flex items-center justify-center space-x-2 transition"
@@ -294,13 +542,18 @@ export const SplitView: FC<SplitViewProps> = ({ documentId, documentTitle }) => 
           type="text"
           value={inputText}
           onChange={(e) => setInputText(e.target.value)}
-          placeholder="Hỏi về biểu đồ, doanh thu, lợi nhuận, chú thích chân trang..."
+          placeholder={
+            modeTab === 'comparative'
+              ? 'Hỏi so sánh YoY (ví dụ: So sánh doanh thu và lợi nhuận 2 kỳ...)'
+              : 'Hỏi về biểu đồ, doanh thu, lợi nhuận, chú thích chân trang...'
+          }
           className="flex-1 bg-slate-800/80 border border-slate-700 text-sm px-4 py-3 rounded-xl focus:outline-none focus:border-indigo-500 text-slate-100 placeholder-slate-400 min-h-[48px]"
         />
         <button
           type="submit"
+          data-testid="btn-submit-query"
           disabled={state === 'loading' || !inputText.trim()}
-          className="min-w-[48px] min-h-[48px] bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-800 disabled:text-slate-600 text-white rounded-xl flex items-center justify-center transition shadow"
+          className="min-w-[48px] min-h-[48px] bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-800 disabled:text-slate-600 text-white rounded-xl flex items-center justify-center transition shadow cursor-pointer"
         >
           <Send className="w-5 h-5" />
         </button>

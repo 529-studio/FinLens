@@ -16,6 +16,7 @@ export interface GroundedEvidenceDTO {
   label: string;
   extracted_value?: string | number;
   confidence: number;
+  document_id?: string;
 }
 
 export interface QueryRequestDTO {
@@ -35,6 +36,33 @@ export interface QueryResponseDTO {
   latency_ms: number;
   cached?: boolean;
 }
+
+export interface ComparativeMetricDTO {
+  metric: string;
+  unit?: string;
+  doc_values: Record<string, string | number>;
+  yoy_growth?: string;
+  trend?: 'up' | 'down' | 'neutral';
+}
+
+export interface ComparativeQueryRequestDTO {
+  document_ids: string[];
+  query_text: string;
+  top_k_per_doc?: number;
+  inference_mode?: 'auto' | 'local' | 'cloud';
+}
+
+export interface ComparativeQueryResponseDTO {
+  document_ids: string[];
+  query_text: string;
+  answer: string;
+  comparative_metrics: ComparativeMetricDTO[];
+  evidences: GroundedEvidenceDTO[];
+  retrieved_pages: Record<string, number[]>;
+  engine_used: string;
+  latency_ms: number;
+}
+
 
 export interface DocumentIngestResponseDTO {
   document_id: string;

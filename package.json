@@ -6,7 +6,7 @@
   "scripts": {
     "dev:desktop": "npm run --prefix apps/desktop dev",
     "dev:engine": "python3 packages/core-engine/src/main.py",
-    "dev:addin": "npm run --prefix packages/office-addin dev",
+    "dev:addin": "npm run --prefix apps/excel dev",
     "bench:recall": "python3 benchmarks/eval_retrieval.py",
     "lore:status": "lore status",
     "lore:ingest": "lore ingest",

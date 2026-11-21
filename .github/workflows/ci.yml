@@ -52,6 +52,8 @@ jobs:
         run: |
           npm install
           npm install --prefix apps/excel
-      - name: Build Excel Add-in
-        run: npm --prefix apps/excel run build
+      - name: Build and Test Excel Add-in
+        run: |
+          npm --prefix apps/excel test
+          npm --prefix apps/excel run build
 

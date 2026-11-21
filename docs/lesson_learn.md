@@ -204,6 +204,22 @@
     - Lắng nghe sự kiện `WindowEvent::Destroyed` và `RunEvent::ExitRequested` từ Tauri v2 để đảm bảo **0 zombie processes** trong mọi kịch bản đóng ứng dụng.
   - *Hook đa tầng `useDaemonLifecycle`:* Tự động phát hiện môi trường `__TAURI_INTERNALS__` để gọi lệnh Tauri IPC `get_daemon_status` hoặc fallback sang fetch HTTP, hiển thị trạng thái kết nối thời gian thực với độ trễ (latency ms) và nút Retry đạt chuẩn Kiosk $\ge 48\text{px}$.
 
+### Bài học 19: Tích Hợp Xuất Bảng Tài Chính Sang Microsoft Excel (Office.js) & Tự Động Tạo Công Thức Tính Tổng Kèm Audit Trail
+- **Bối cảnh & Thách thức:**
+  1. *Thiếu tính liên kết công thức (Static Values vs Dynamic Formulas):* Khi trích xuất bảng tài chính từ BCTC vào bảng tính Excel, nếu chỉ chèn các giá trị tĩnh (raw numbers) mà không tái tạo công thức tính toán (`=SUM(...)`), chuyên viên tài chính phải mất công thiết lập lại thủ công các dòng tổng cộng.
+  2. *Mất dấu vết kiểm toán (Audit Trail Loss):* Dữ liệu chèn vào bảng tính dễ bị mất liên kết nguồn nếu không đính kèm chú thích (comment) rõ ràng trỏ về ID tài liệu và số trang gốc trong BCTC.
+  3. *Môi trường runtime Office.js phân tán:* Office.js chỉ hoạt động khi chạy bên trong máy khách Excel (Desktop, Web, Mac). Khi kiểm thử tự động bằng Vitest hoặc chạy trên trình duyệt web độc lập, nếu không có lớp phòng thủ kiểm tra `typeof Excel !== 'undefined'`, ứng dụng sẽ gặp lỗi `ReferenceError: Excel is not defined`.
+  4. *Nợ kỹ thuật Monorepo:* Sự tồn tại song song của thư mục cũ `packages/office-addin/` bên cạnh `apps/excel/` gây nhầm lẫn trong lệnh script và lãng phí dung lượng.
+- **Giải pháp chuẩn hóa (Sprint 7 - Task S7-04):**
+  - *Bộ xuất bảng `table-export.ts` thông minh:*
+    - Chuyển đổi linh hoạt chỉ số cột sang ký tự Excel (`getColumnLetter`: 0 -> A, 1 -> B, 26 -> AA).
+    - Tự động nhận diện các cột chứa dữ liệu số, bổ sung hàng "Tổng cộng" và điền công thức native `=SUM(ColStart:ColEnd)`.
+    - Định dạng tiêu đề chuyên nghiệp (nền xanh thẫm `#1E293B`, chữ trắng in đậm, tự động căn chỉnh độ rộng cột `autofitColumns()`).
+    - Gắn chú thích kiểm toán qua `context.workbook.comments.add(originCell, comment, 'Plain')` giúp người dùng nhấp trực tiếp để đối chiếu bằng chứng thị giác trên Desktop.
+    - Cơ chế fallback an toàn: Tự động phát hiện nếu thiếu Office.js runtime và trả về kết quả mô phỏng có cấu trúc, cho phép kiểm thử tự động 100% trong Vitest và Playwright.
+  - *Dọn dẹp triệt để nợ kỹ thuật monorepo:* Xóa bỏ hoàn toàn thư mục thừa `packages/office-addin/`, cập nhật script `dev:addin` trỏ về `apps/excel`, tối ưu hóa luồng CI test song song.
+
+
 
 
 

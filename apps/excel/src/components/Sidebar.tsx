@@ -3,7 +3,8 @@ import { useFinsightQuery } from '../lib/hooks/use-query';
 import { SidebarSkeleton } from './SidebarSkeleton';
 import { DocumentUploader } from './DocumentUploader';
 import { bridge } from '../lib/bridge/client';
-import { DocumentIngestResponseDTO, ActiveDocumentState } from '../types/api';
+import { DocumentIngestResponseDTO, ActiveDocumentState, FinancialTableData } from '../types/api';
+import { insertFinancialTableToSheet } from '../lib/excel/table-export';
 import {
   RefreshCw,
   Search,
@@ -15,6 +16,7 @@ import {
   Clock,
   Sparkles,
   FileSpreadsheet,
+  ArrowDownToLine,
 } from 'lucide-react';
 
 export const Sidebar: React.FC = () => {
@@ -27,6 +29,10 @@ export const Sidebar: React.FC = () => {
 
   const [searchQuery, setSearchQuery] = useState('Cơ cấu doanh thu năm 2023 thay đổi ra sao?');
   const [submittedQuery, setSubmittedQuery] = useState('');
+  const [exportState, setExportState] = useState<{
+    status: 'idle' | 'exporting' | 'success' | 'error';
+    message?: string;
+  }>({ status: 'idle' });
 
   const {
     data: queryResult,
@@ -38,6 +44,35 @@ export const Sidebar: React.FC = () => {
   useEffect(() => {
     bridge.connect();
   }, []);
+
+  const handleExportTable = async () => {
+    if (!queryResult) return;
+    setExportState({ status: 'exporting' });
+    try {
+      const tableData: FinancialTableData = {
+        title: 'Cơ Cấu Doanh Thu Thuần BCTC 2023',
+        headers: ['Thị Trường / Phân Khúc', 'Năm 2022 (Tỷ VNĐ)', 'Năm 2023 (Tỷ VNĐ)'],
+        rows: [
+          ['Thị trường Nội địa', 48200, 50617],
+          ['Thị trường Xuất khẩu', 9120, 9862],
+        ],
+        includeTotalRow: true,
+        sourceDocId: activeDoc.documentId || 'VNM_BCTC_2023_AUDITED',
+        sourcePage: 1,
+      };
+
+      const res = await insertFinancialTableToSheet(tableData);
+      setExportState({
+        status: 'success',
+        message: `Đã chèn bảng vào ${res.originAddress} thành công! Kèm công thức =SUM và Audit Trail comment.`,
+      });
+    } catch (err: any) {
+      setExportState({
+        status: 'error',
+        message: err.message || 'Lỗi không xác định khi xuất bảng vào Excel.',
+      });
+    }
+  };
 
   const handleIngestSuccess = (doc: DocumentIngestResponseDTO, filename: string) => {
     setActiveDoc({
@@ -229,6 +264,57 @@ export const Sidebar: React.FC = () => {
 
             <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 text-xs text-slate-700 leading-relaxed">
               {queryResult.data}
+            </div>
+
+            {/* 1-Click Financial Table Export Action */}
+            <div className="space-y-2 pt-2 border-t border-slate-200/60">
+              <button
+                type="button"
+                data-testid="btn-export-table"
+                disabled={exportState.status === 'exporting'}
+                onClick={handleExportTable}
+                className="w-full min-h-[48px] flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 text-white px-4 py-2.5 rounded-lg font-medium text-xs shadow-sm transition"
+              >
+                {exportState.status === 'exporting' ? (
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                ) : (
+                  <ArrowDownToLine className="w-4 h-4" />
+                )}
+                <span>
+                  {exportState.status === 'exporting'
+                    ? 'Đang chèn bảng vào sheet...'
+                    : 'Xuất Bảng Vào Excel (=SUM & Audit Trail)'}
+                </span>
+              </button>
+
+              {exportState.status === 'success' && (
+                <div
+                  data-testid="export-success-badge"
+                  className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-lg text-emerald-800 text-[11px] flex items-start gap-2"
+                >
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                  <span>{exportState.message}</span>
+                </div>
+              )}
+
+              {exportState.status === 'error' && (
+                <div
+                  data-testid="export-error-badge"
+                  className="p-2.5 bg-red-50 border border-red-200 rounded-lg text-red-800 text-[11px] flex items-start justify-between gap-2"
+                >
+                  <div className="flex items-start gap-1.5">
+                    <AlertCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+                    <span>{exportState.message}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleExportTable}
+                    className="min-h-[48px] px-2 text-red-700 hover:text-red-900 underline font-semibold flex items-center"
+                  >
+                    Thử lại
+                  </button>
+                </div>
+              )}
             </div>
 
             <button

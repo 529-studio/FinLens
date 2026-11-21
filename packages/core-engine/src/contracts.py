@@ -303,5 +303,38 @@ class StreamingChunk(BaseModel):
     error: Optional[str] = None
 
 
+class FootnoteItem(BaseModel):
+    """Structured financial statement footnote (Thuyết minh BCTC) reference."""
+    line_item: str
+    code: Optional[str] = None
+    footnote_number: str
+    footnote_title: str
+    summary: str
+    page_number: int
+    bounding_box: BoundingBox
+
+
+class FootnoteQueryRequest(BaseModel):
+    """Request payload to extract and disambiguate footnote citations."""
+    document_id: str
+    line_items: Optional[List[str]] = None
+
+    @field_validator("document_id")
+    @classmethod
+    def sanitize_doc_id(cls, v: str):
+        if not re.match(r"^[a-zA-Z0-9_\-]+$", v) or ".." in v or len(v) > 64:
+            raise ValueError("Access denied: Invalid or malicious document_id")
+        return v
+
+
+class FootnoteQueryResponse(BaseModel):
+    """Response payload containing extracted footnotes mapped to balance sheet items."""
+    document_id: str
+    total_footnotes: int
+    footnotes: List[FootnoteItem]
+    elapsed_ms: float
+
+
+
 
 

@@ -75,4 +75,28 @@ describe('table-export utility', () => {
     expect(res.auditComment).toContain('VNM_2023');
     expect(res.auditComment).toContain('trang 2');
   });
+
+  it('embeds footnote citations into auditComment when footnotes are provided', async () => {
+    const tableData: FinancialTableData = {
+      headers: ['Chỉ tiêu', 'Thuyết minh', 'Giá trị'],
+      rows: [['Tiền và tương đương tiền', '4', 2671120]],
+      sourceDocId: 'VNM_BCTC_2023_AUDITED',
+      sourcePage: 2,
+      footnotes: [
+        {
+          lineItem: 'Tiền và tương đương tiền',
+          footnoteNumber: '4',
+          footnoteTitle: 'Tiền và các khoản tương đương tiền',
+          summary: 'Tiền gửi ngân hàng không kỳ hạn 1.120.400 triệu đồng',
+          pageNumber: 2,
+        },
+      ],
+    };
+
+    const res = await insertFinancialTableToSheet(tableData);
+    expect(res.success).toBe(true);
+    expect(res.footnotesCount).toBe(1);
+    expect(res.auditComment).toContain('TM 4');
+    expect(res.auditComment).toContain('Tiền gửi ngân hàng không kỳ hạn');
+  });
 });

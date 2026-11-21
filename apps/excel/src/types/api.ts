@@ -28,6 +28,14 @@ export interface ActiveDocumentState {
   errorMessage?: string;
 }
 
+export interface FootnoteCitation {
+  lineItem: string;
+  footnoteNumber: string;
+  footnoteTitle: string;
+  summary: string;
+  pageNumber: number;
+}
+
 export interface FinancialTableData {
   title?: string;
   headers: string[];
@@ -35,6 +43,7 @@ export interface FinancialTableData {
   includeTotalRow?: boolean;
   sourceDocId: string;
   sourcePage: number;
+  footnotes?: FootnoteCitation[];
 }
 
 export interface TableExportResult {
@@ -42,6 +51,7 @@ export interface TableExportResult {
   insertedCellsCount: number;
   originAddress: string;
   auditComment: string;
+  footnotesCount?: number;
 }
 
 

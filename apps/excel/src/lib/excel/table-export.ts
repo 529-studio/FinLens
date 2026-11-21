@@ -74,7 +74,13 @@ export async function insertFinancialTableToSheet(
   data: FinancialTableData
 ): Promise<TableExportResult> {
   const { valuesMatrix, totalRowIndex } = prepareExportMatrix(data);
-  const auditComment = `[FinSight Audit Trail] Trích xuất từ tài liệu ${data.sourceDocId}, trang ${data.sourcePage}. Nhấp vào sidebar để xem ảnh gốc.`;
+  let auditComment = `[FinSight Audit Trail] Trích xuất từ tài liệu ${data.sourceDocId}, trang ${data.sourcePage}. Nhấp vào sidebar để xem ảnh gốc.`;
+  if (data.footnotes && data.footnotes.length > 0) {
+    const fnSummary = data.footnotes
+      .map((f) => `TM ${f.footnoteNumber} (${f.lineItem}): ${f.summary}`)
+      .join(' | ');
+    auditComment += ` | Thuyết minh BCTC: ${fnSummary}`;
+  }
 
   // 1. Office.js Runtime
   if (typeof Excel !== 'undefined' && typeof Excel.run === 'function') {
@@ -132,6 +138,7 @@ export async function insertFinancialTableToSheet(
         insertedCellsCount: rowCount * colCount,
         originAddress: selectedRange.address,
         auditComment,
+        footnotesCount: data.footnotes ? data.footnotes.length : 0,
       };
     });
   }
@@ -143,5 +150,6 @@ export async function insertFinancialTableToSheet(
     insertedCellsCount: valuesMatrix.length * data.headers.length,
     originAddress: 'A1:C5 (Mock)',
     auditComment,
+    footnotesCount: data.footnotes ? data.footnotes.length : 0,
   };
 }

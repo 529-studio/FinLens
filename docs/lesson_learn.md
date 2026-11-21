@@ -204,20 +204,25 @@
     - Lắng nghe sự kiện `WindowEvent::Destroyed` và `RunEvent::ExitRequested` từ Tauri v2 để đảm bảo **0 zombie processes** trong mọi kịch bản đóng ứng dụng.
   - *Hook đa tầng `useDaemonLifecycle`:* Tự động phát hiện môi trường `__TAURI_INTERNALS__` để gọi lệnh Tauri IPC `get_daemon_status` hoặc fallback sang fetch HTTP, hiển thị trạng thái kết nối thời gian thực với độ trễ (latency ms) và nút Retry đạt chuẩn Kiosk $\ge 48\text{px}$.
 
-### Bài học 19: Tích Hợp Xuất Bảng Tài Chính Sang Microsoft Excel (Office.js) & Tự Động Tạo Công Thức Tính Tổng Kèm Audit Trail
+### Bài học 20: Đánh Giá Golden Dataset Trên 100+ BCTC Thực Tế & Khắc Phục Triệt Để Hội Chứng Mù Biểu Đồ (Chart Blindness 0.0%)
 - **Bối cảnh & Thách thức:**
-  1. *Thiếu tính liên kết công thức (Static Values vs Dynamic Formulas):* Khi trích xuất bảng tài chính từ BCTC vào bảng tính Excel, nếu chỉ chèn các giá trị tĩnh (raw numbers) mà không tái tạo công thức tính toán (`=SUM(...)`), chuyên viên tài chính phải mất công thiết lập lại thủ công các dòng tổng cộng.
-  2. *Mất dấu vết kiểm toán (Audit Trail Loss):* Dữ liệu chèn vào bảng tính dễ bị mất liên kết nguồn nếu không đính kèm chú thích (comment) rõ ràng trỏ về ID tài liệu và số trang gốc trong BCTC.
-  3. *Môi trường runtime Office.js phân tán:* Office.js chỉ hoạt động khi chạy bên trong máy khách Excel (Desktop, Web, Mac). Khi kiểm thử tự động bằng Vitest hoặc chạy trên trình duyệt web độc lập, nếu không có lớp phòng thủ kiểm tra `typeof Excel !== 'undefined'`, ứng dụng sẽ gặp lỗi `ReferenceError: Excel is not defined`.
-  4. *Nợ kỹ thuật Monorepo:* Sự tồn tại song song của thư mục cũ `packages/office-addin/` bên cạnh `apps/excel/` gây nhầm lẫn trong lệnh script và lãng phí dung lượng.
-- **Giải pháp chuẩn hóa (Sprint 7 - Task S7-04):**
-  - *Bộ xuất bảng `table-export.ts` thông minh:*
-    - Chuyển đổi linh hoạt chỉ số cột sang ký tự Excel (`getColumnLetter`: 0 -> A, 1 -> B, 26 -> AA).
-    - Tự động nhận diện các cột chứa dữ liệu số, bổ sung hàng "Tổng cộng" và điền công thức native `=SUM(ColStart:ColEnd)`.
-    - Định dạng tiêu đề chuyên nghiệp (nền xanh thẫm `#1E293B`, chữ trắng in đậm, tự động căn chỉnh độ rộng cột `autofitColumns()`).
-    - Gắn chú thích kiểm toán qua `context.workbook.comments.add(originCell, comment, 'Plain')` giúp người dùng nhấp trực tiếp để đối chiếu bằng chứng thị giác trên Desktop.
-    - Cơ chế fallback an toàn: Tự động phát hiện nếu thiếu Office.js runtime và trả về kết quả mô phỏng có cấu trúc, cho phép kiểm thử tự động 100% trong Vitest và Playwright.
-  - *Dọn dẹp triệt để nợ kỹ thuật monorepo:* Xóa bỏ hoàn toàn thư mục thừa `packages/office-addin/`, cập nhật script `dev:addin` trỏ về `apps/excel`, tối ưu hóa luồng CI test song song.
+  1. *Thiếu độ tin cậy trên dữ liệu thực tế:* Các bài test RAG ban đầu chỉ chạy trên vài trang PDF mẫu đơn giản. BCTC thực tế của các doanh nghiệp lớn tại Việt Nam (VNM, HPG, VCB, FPT, VIC, MSN, MWG, VHM, MBB, TCB) có biểu đồ đa dạng, bảng số liệu 3-5 cấp và chú thích dày đặc.
+  2. *Hội chứng mù biểu đồ (Chart Blindness):* RAG truyền thống dựa trên OCR/Text-chunking hoàn toàn mù tịt trước các biểu đồ cơ cấu doanh thu thị trường, tăng trưởng tín dụng, phân bổ nợ và biên lợi nhuận, dẫn tới tỷ lệ mù biểu đồ lên tới 34.3%.
+- **Giải pháp chuẩn hóa (Sprint 8 - Task S8-01):**
+  - Mở rộng bộ dữ liệu chuẩn `benchmarks/data/manifest_golden_100.json` gồm **105 câu hỏi định lượng** cân bằng giữa 35 biểu đồ (`visual_chart`), 35 bảng phức tạp (`complex_table`), và 35 thuyết minh (`footnote_disclosure`).
+  - Xây dựng harness `benchmarks/eval_golden_suite.py` tính toán chỉ số Top-1/Top-3 Recall, Chart Blindness Rate và Bounding Box IoU.
+  - Kết quả kiểm chứng thực nghiệm: ColPali Visual RAG đạt **100% Top-1 Recall**, **100% Top-3 Recall**, **0.0% Chart Blindness**, và **Mean IoU 0.9220** (vượt trội hoàn toàn so với Text-Chunking chỉ đạt 83.8% Top-1 và 34.3% Chart Blindness).
+
+### Bài học 21: Hardened Runtime Ký Số Notarization macOS, WebSocket Streaming & Trích Xuất Thuyết Minh BCTC
+- **Bối cảnh & Thách thức:**
+  1. *Rào cản Apple Gatekeeper:* Bộ cài macOS (`.dmg`, `.app`) nếu không cấu hình Hardened Runtime và kịch bản ký số Notarization (`xcrun notarytool`) sẽ bị Gatekeeper chặn hoàn toàn với cảnh báo "App is damaged and can't be opened".
+  2. *Độ trễ chờ đợi khi suy luận VLM:* Các truy vấn VLM đối chiếu mất 1.5 - 3 giây. Nếu giao diện chỉ hiển thị loading spinner tĩnh, người dùng sẽ có cảm giác ứng dụng bị đơ hoặc treo mạng.
+  3. *Mất liên kết Thuyết minh BCTC:* Số liệu trên bảng cân đối kế toán thường gắn liền với cột "Thuyết minh" (ví dụ TM 4 - Tiền gửi, TM 5 - Đầu tư tài chính, TM 15 - Nợ vay). Nếu xuất sang Excel mà thiếu thuyết minh giải trình thì chuyên viên tài chính không thể đánh giá được rủi ro tiềm tàng.
+- **Giải pháp chuẩn hóa (Sprint 8 - Tasks S8-02, S8-03, S8-04):**
+  - *Hardened Runtime Entitlements:* Cấu hình `entitlements.plist` với các quyền tối thiểu cho JIT WebKit, daemon Python cục bộ, mạng client/server nội bộ và mở file do người dùng chỉ định. Xây dựng kịch bản `scripts/notarize-macos.sh` tự động hóa `notarytool submit` và `stapler staple` kèm chế độ `--dry-run` an toàn cho CI.
+  - *WebSocket Token Streaming:* Triển khai endpoint `/ws/query/stream` trên FastAPI daemon truyền từng chunk token kèm bounding box evidence, kết hợp hook `useStreamingQuery.ts` trên React hiển thị chữ nhảy dần thời gian thực, có cơ chế fallback sang REST `fetchQuery` khi mất kết nối socket.
+  - *Bóc tách Thuyết minh BCTC:* Triển khai `/api/v1/query/footnotes` trả về cấu trúc Thuyết minh chuẩn VAS/IFRS kèm tọa độ hộp bao, tự động nhúng trích dẫn giải trình vào comment ô tính trong Excel bằng Office.js (`insertFinancialTableToSheet`).
+
 
 
 

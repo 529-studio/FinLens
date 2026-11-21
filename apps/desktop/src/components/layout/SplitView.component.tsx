@@ -10,6 +10,7 @@ import { useState, type FormEvent, type FC } from 'react';
 import { useVisualRag } from '../../hooks/useVisualRag.hook';
 import { useSettings } from '../../hooks/useSettings.hook';
 import { useBridgeServer } from '../../hooks/useBridgeServer';
+import { useDaemonLifecycle } from '../../hooks/useDaemonLifecycle';
 import { ResizableSplitView } from './ResizableSplitView';
 import { BoundingBoxOverlay } from '../pdf/BoundingBoxOverlay';
 import { PdfViewer } from '../pdf/PdfViewer';
@@ -57,6 +58,7 @@ export const SplitView: FC<SplitViewProps> = ({ documentId, documentTitle }) => 
   } = useVisualRag(documentId);
 
   const { inferenceMode } = useSettings();
+  const daemon = useDaemonLifecycle();
 
   useBridgeServer((citationId) => {
     console.log(`Navigation requested for citation: ${citationId}`);
@@ -164,10 +166,46 @@ export const SplitView: FC<SplitViewProps> = ({ documentId, documentTitle }) => 
           <h1 className="font-semibold text-sm">FinSight AI Copilot</h1>
         </div>
         <div className="flex items-center space-x-2">
+          {/* Daemon Lifecycle Status Badge */}
+          <div
+            data-testid="daemon-status-badge"
+            className="flex items-center space-x-1.5 px-2.5 py-1 rounded-full text-xs font-mono bg-slate-800/80 border border-slate-700"
+            title={daemon.error || (daemon.status === 'online' ? `Daemon online on port ${daemon.port}` : 'Connecting to daemon...')}
+          >
+            <span
+              className={`w-2 h-2 rounded-full ${
+                daemon.status === 'online'
+                  ? 'bg-emerald-400'
+                  : daemon.status === 'connecting'
+                  ? 'bg-amber-400 animate-pulse'
+                  : 'bg-rose-400'
+              }`}
+            />
+            <span className="text-slate-300 text-[11px]">
+              {daemon.status === 'online'
+                ? `:8765${daemon.latencyMs !== null ? ` (${daemon.latencyMs}ms)` : ''}`
+                : daemon.status === 'connecting'
+                ? 'Connecting...'
+                : 'Offline'}
+            </span>
+            {daemon.status === 'offline' && (
+              <button
+                type="button"
+                onClick={daemon.retry}
+                className="min-h-[48px] px-2 text-indigo-400 hover:text-indigo-300 underline text-[11px] flex items-center"
+                title="Thử kết nối lại"
+                aria-label="Thử kết nối lại daemon"
+              >
+                <RefreshCw className="w-3 h-3 mr-0.5" />
+                Retry
+              </button>
+            )}
+          </div>
+
           <button
             type="button"
             onClick={() => setIsSettingsOpen(true)}
-            className="p-2 hover:bg-slate-800 text-slate-400 hover:text-slate-200 rounded-lg transition"
+            className="min-h-[48px] min-w-[48px] p-2 hover:bg-slate-800 text-slate-400 hover:text-slate-200 rounded-lg transition flex items-center justify-center"
             title="Cài đặt mô hình AI"
             aria-label="Cài đặt mô hình AI"
           >

@@ -191,5 +191,19 @@
   - *Gán nhãn định danh tài liệu vào GroundedEvidence:* Bổ sung trường `document_id: Optional[str]` vào hợp đồng `GroundedEvidence` (cả Python Core Engine lẫn TypeScript DTOs), cho phép UI định tuyến chuyển đổi tài liệu và hiển thị badge `[VNM_2022]` rõ ràng trên từng chip trích dẫn.
   - *Giao diện đối chiếu YoY công thái học:* Thiết kế bảng thẻ số liệu delta (YoY Metric Delta Cards) hiển thị tỷ lệ tăng trưởng và chỉ báo xu hướng (`up`, `down`, `neutral`), đảm bảo toàn bộ nút bấm đáp ứng chuẩn Kiosk $\ge 48\text{px}$ và 100% SVG vector Lucide React.
 
+### Bài học 18: Kiến Trúc Desktop Lai Tauri v2 & Quản Lý Vòng Đời Tiến Trình Con Không Zombie (Zero-Zombie Lifecycle)
+- **Bối cảnh & Thách thức:**
+  1. *Nguy cơ tiến trình mồ côi (Zombie / Orphaned Python Processes):* FinSight Desktop kết hợp frontend React với tiến trình daemon Python nền (`packages/core-engine/src/main.py`). Nếu người dùng đóng cửa sổ hoặc thoát ứng dụng đột ngột, tiến trình Python daemon có thể tiếp tục chạy ngầm, chiếm dụng cổng 8765 và tài nguyên RAM/VRAM quý giá.
+  2. *Độ trễ và rủi ro phụ thuộc crate mạng nặng:* Khi thực hiện health check định kỳ từ Rust sang daemon, việc sử dụng các thư viện HTTP lớn (như reqwest/OpenSSL) dễ gây xung đột liên kết tĩnh trên macOS/Linux và làm phình to kích thước tệp thực thi.
+  3. *Tính nhất quán giữa môi trường Native Desktop và Trình duyệt dev:* Frontend React cần hoạt động trơn tru trong cả môi trường nhúng Tauri v2 (sử dụng IPC invoke) và trình duyệt web / Playwright MCP test runner (sử dụng fetch trực tiếp).
+- **Giải pháp chuẩn hóa (Sprint 7 - Task S7-03):**
+  - *Tối ưu cấu hình đóng gói Tauri v2:* Cấu hình `tauri.conf.json` chuẩn hóa mục tiêu `bundle.targets: ["dmg", "app"]`, kích thước cửa sổ tài chính 1280x800, tạo ra bộ cài siêu nhẹ (`.app` 10.4MB, `.dmg` 3.7MB).
+  - *Bộ quản lý tiến trình Rust `DaemonManager` an toàn tuyệt đối:*
+    - Sử dụng `std::net::TcpStream` nguyên bản từ thư viện chuẩn Rust để thăm dò `/health` trong 600ms không cần phụ thuộc crate bên ngoài.
+    - Quản lý tiến trình con trong `Mutex<Option<Child>>` và triển khai trait `Drop` tự động gọi `child.kill()` và `child.wait()` để dọn sạch tiến trình con ngay khi thoát.
+    - Lắng nghe sự kiện `WindowEvent::Destroyed` và `RunEvent::ExitRequested` từ Tauri v2 để đảm bảo **0 zombie processes** trong mọi kịch bản đóng ứng dụng.
+  - *Hook đa tầng `useDaemonLifecycle`:* Tự động phát hiện môi trường `__TAURI_INTERNALS__` để gọi lệnh Tauri IPC `get_daemon_status` hoặc fallback sang fetch HTTP, hiển thị trạng thái kết nối thời gian thực với độ trễ (latency ms) và nút Retry đạt chuẩn Kiosk $\ge 48\text{px}$.
+
+
 
 

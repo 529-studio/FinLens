@@ -20,6 +20,7 @@ export function useVisualRag(documentId: string) {
   const [activeEvidence, setActiveEvidence] = useState<GroundedEvidenceDTO | null>(null);
   const [history, setHistory] = useState<QueryResponseDTO[]>([]);
   const [comparativeHistory, setComparativeHistory] = useState<ComparativeQueryResponseDTO[]>([]);
+  const [streamingAnswer, setStreamingAnswer] = useState<string>('');
   const abortControllerRef = useRef<AbortController | null>(null);
 
   const ask = useCallback(
@@ -28,6 +29,7 @@ export function useVisualRag(documentId: string) {
 
       setState('loading');
       setError(null);
+      setStreamingAnswer('');
 
       // Abort previous in-flight request
       if (abortControllerRef.current) {
@@ -35,26 +37,86 @@ export function useVisualRag(documentId: string) {
       }
       abortControllerRef.current = new AbortController();
 
+      const payload: QueryRequestDTO = {
+        document_id: documentId,
+        query_text: queryText,
+        inference_mode: mode,
+      };
+
+      let streamedSuccessfully = false;
       try {
-        const payload: QueryRequestDTO = {
-          document_id: documentId,
-          query_text: queryText,
-          inference_mode: mode,
-        };
-        const response = await fetchQuery(payload, abortControllerRef.current.signal);
+        if (typeof WebSocket !== 'undefined') {
+          await new Promise<void>((resolve, reject) => {
+            const ws = new WebSocket('ws://127.0.0.1:8765/ws/query/stream');
+            let accumulated = '';
+            let evidences: GroundedEvidenceDTO[] = [];
 
-        setHistory((prev) => [...prev, response]);
-        setState('success');
+            ws.onopen = () => {
+              ws.send(JSON.stringify(payload));
+            };
 
-        // Automatically focus on the first evidence if available
-        if (response.evidences.length > 0) {
-          setActiveEvidence(response.evidences[0]);
+            ws.onmessage = (event) => {
+              try {
+                const data = JSON.parse(event.data);
+                if (data.event === 'token' && typeof data.token === 'string') {
+                  accumulated += data.token;
+                  setStreamingAnswer(accumulated);
+                } else if (data.event === 'evidence' && Array.isArray(data.evidences)) {
+                  evidences = data.evidences;
+                } else if (data.event === 'done') {
+                  streamedSuccessfully = true;
+                  const fullResp: QueryResponseDTO = {
+                    document_id: documentId,
+                    query_text: queryText,
+                    answer: data.answer || accumulated,
+                    evidences: evidences,
+                    retrieved_page_numbers: evidences.map((e) => e.page_number),
+                    engine_used: 'vlm-stream',
+                    latency_ms: data.elapsed_ms || 0,
+                    cached: false,
+                  };
+                  setHistory((prev) => [...prev, fullResp]);
+                  if (evidences.length > 0) {
+                    setActiveEvidence(evidences[0]);
+                  }
+                  setStreamingAnswer('');
+                  setState('success');
+                  ws.close();
+                  resolve();
+                } else if (data.event === 'error') {
+                  ws.close();
+                  reject(new Error(data.error));
+                }
+              } catch (e) {
+                reject(e);
+              }
+            };
+
+            ws.onerror = () => {
+              reject(new Error('WebSocket connection failed'));
+            };
+          });
         }
-      } catch (err: any) {
-        if (err.name === 'AbortError') return;
-        const msg = err instanceof ApiError ? err.message : 'Unknown communication failure';
-        setError(msg);
-        setState('error');
+      } catch {
+        // Fall back gracefully to REST fetchQuery if WebSocket fails
+      }
+
+      if (!streamedSuccessfully) {
+        try {
+          const response = await fetchQuery(payload, abortControllerRef.current?.signal);
+          setHistory((prev) => [...prev, response]);
+          setState('success');
+          setStreamingAnswer('');
+          if (response.evidences.length > 0) {
+            setActiveEvidence(response.evidences[0]);
+          }
+        } catch (err: any) {
+          if (err.name === 'AbortError') return;
+          const msg = err instanceof ApiError ? err.message : 'Unknown communication failure';
+          setError(msg);
+          setState('error');
+          setStreamingAnswer('');
+        }
       }
     },
     [documentId]
@@ -112,6 +174,7 @@ export function useVisualRag(documentId: string) {
     history,
     comparativeHistory,
     activeEvidence,
+    streamingAnswer,
     ask,
     askComparative,
     focusEvidence,

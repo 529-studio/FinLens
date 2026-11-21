@@ -42,6 +42,9 @@ from contracts import (
     CacheClearRequest,
     ComparativeQueryRequest,
     ComparativeQueryResponse,
+    FootnoteQueryRequest,
+    FootnoteQueryResponse,
+    FootnoteItem,
 )
 from renderer import PdfRenderer
 from retriever import VisualRetriever
@@ -576,6 +579,43 @@ async def query_comparative_documents(req: ComparativeQueryRequest):
         engine_used=vlm_res["engine"],
         latency_ms=round(duration_ms, 2),
     )
+
+
+@app.post("/api/v1/query/footnotes", response_model=FootnoteQueryResponse)
+async def query_footnotes(req: FootnoteQueryRequest):
+    """
+    Extracts and disambiguates Thuyết minh BCTC citations for financial balance sheet items.
+    Enforces strict path traversal defense (Rule 13B).
+    """
+    start_time = time.time()
+    if not req.document_id or not re.match(r"^[a-zA-Z0-9_\-]+$", req.document_id) or ".." in req.document_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Access denied: Invalid or malicious document_id (path traversal rejected)"
+        )
+
+    raw_items = router.extract_footnotes(req.document_id, req.line_items)
+    items = [
+        FootnoteItem(
+            line_item=it["line_item"],
+            code=it.get("code"),
+            footnote_number=it["footnote_number"],
+            footnote_title=it["footnote_title"],
+            summary=it["summary"],
+            page_number=it["page_number"],
+            bounding_box=BoundingBox(**it["bounding_box"])
+        )
+        for it in raw_items
+    ]
+
+    duration_ms = (time.time() - start_time) * 1000.0
+    return FootnoteQueryResponse(
+        document_id=req.document_id,
+        total_footnotes=len(items),
+        footnotes=items,
+        elapsed_ms=round(duration_ms, 2)
+    )
+
 
 
 

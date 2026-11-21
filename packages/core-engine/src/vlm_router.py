@@ -173,3 +173,34 @@ class VlmRouter:
                 "- Tài sản ngắn hạn: 35.617.200 triệu VNĐ, trong đó tiền và tương đương tiền đạt 2.671.120 triệu VNĐ.\n"
                 "- Đầu tư tài chính ngắn hạn (tiền gửi ngân hàng) chiếm tỷ trọng lớn: 23.115.000 triệu VNĐ."
             )
+
+    async def stream_analyze_pages(
+        self,
+        pages: List[Tuple[str, int]],
+        query: str,
+        preferred_mode: str = "auto",
+        chunk_words_count: int = 4
+    ):
+        """
+        Asynchronously streams inference token chunks followed by evidence and completion events.
+        """
+        result = await self.analyze_pages(pages, query, preferred_mode)
+        answer = result.get("answer", "")
+        evidences = result.get("evidences", [])
+        latency_ms = result.get("latency_ms", 0)
+
+        # Tokenize into word chunks
+        words = answer.split(" ")
+        for i in range(0, len(words), chunk_words_count):
+            group = words[i:i + chunk_words_count]
+            chunk_str = " ".join(group)
+            if i + chunk_words_count < len(words):
+                chunk_str += " "
+            yield {"event": "token", "token": chunk_str}
+
+        # Yield visual grounding bounding box evidence
+        yield {"event": "evidence", "evidences": evidences}
+
+        # Yield completion done event
+        yield {"event": "done", "answer": answer, "elapsed_ms": latency_ms}
+

@@ -7,11 +7,15 @@ Governed by ADR-001, ADR-004, and AGENTS.md Rule 13 (Security & Injection Defens
 import re
 import time
 import os
+import json
+import logging
 from typing import Optional, List, Dict, Any
 from pathlib import Path
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, status, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
+
+logger = logging.getLogger("finsight.main")
 
 # Enforce relative path for .env (529 standard)
 ENV_PATH = Path(__file__).resolve().parents[3] / ".env"
@@ -317,6 +321,64 @@ async def websocket_endpoint(websocket: WebSocket):
         ws_manager.disconnect(websocket)
     except Exception:
         ws_manager.disconnect(websocket)
+
+
+@app.websocket("/ws/query/stream")
+async def websocket_query_stream(websocket: WebSocket):
+    """
+    Real-time WebSocket streaming endpoint for progressive VLM token generation.
+    Enforces strict path traversal defense (Rule 13B) and emits token/evidence/done events.
+    """
+    await websocket.accept()
+    try:
+        while True:
+            raw_data = await websocket.receive_text()
+            try:
+                payload = json.loads(raw_data)
+            except Exception:
+                await websocket.send_text(json.dumps({"event": "error", "error": "Invalid JSON format"}))
+                continue
+
+            doc_id = payload.get("document_id")
+            query_text = payload.get("query_text")
+            mode = payload.get("inference_mode", "auto")
+
+            # Path traversal & input security validation (Rule 13)
+            if not doc_id or not re.match(r"^[a-zA-Z0-9_\-]+$", doc_id) or ".." in str(doc_id):
+                await websocket.send_text(json.dumps({
+                    "event": "error",
+                    "error": "Access denied: Invalid or malicious document_id (path traversal rejected)"
+                }))
+                continue
+
+            if not query_text or not isinstance(query_text, str) or not query_text.strip():
+                await websocket.send_text(json.dumps({
+                    "event": "error",
+                    "error": "query_text must be a non-empty string"
+                }))
+                continue
+
+            # Retrieve candidate pages
+            candidate_pages = retriever.search(doc_id, query_text, top_k=2)
+            if not candidate_pages:
+                candidate_pages = [1]
+
+            page_tuples = [
+                (f"~/.finsight/cache/rendered_pages/{doc_id}/page_{p:04d}.png", p)
+                for p in candidate_pages
+            ]
+
+            async for chunk in router.stream_analyze_pages(page_tuples, query_text, mode):
+                await websocket.send_text(json.dumps(chunk))
+
+    except WebSocketDisconnect:
+        pass
+    except Exception as e:
+        logger.error("Error in streaming websocket: %s", e)
+        try:
+            await websocket.send_text(json.dumps({"event": "error", "error": str(e)}))
+        except Exception:
+            pass
 
 
 

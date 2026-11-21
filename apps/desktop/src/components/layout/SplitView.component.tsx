@@ -51,6 +51,7 @@ export const SplitView: FC<SplitViewProps> = ({ documentId, documentTitle }) => 
     history,
     comparativeHistory,
     activeEvidence,
+    streamingAnswer,
     ask,
     askComparative,
     focusEvidence,
@@ -532,16 +533,28 @@ export const SplitView: FC<SplitViewProps> = ({ documentId, documentTitle }) => 
             </div>
           ))}
 
-        {/* STATE 2: SKELETON LOADING STATE */}
+        {/* STATE 2: STREAMING PROGRESSIVE OR SKELETON LOADING STATE */}
         {state === 'loading' && (
-          <div className="flex justify-start animate-pulse">
-            <div className="bg-slate-800/60 border border-slate-700/50 p-4 rounded-2xl rounded-tl-none w-full max-w-md space-y-3">
-              <div className="h-4 bg-slate-700 rounded w-3/4"></div>
-              <div className="h-4 bg-slate-700 rounded w-5/6"></div>
-              <div className="h-4 bg-slate-700 rounded w-1/2"></div>
-              <div className="h-8 bg-slate-700/50 rounded w-1/3 mt-2"></div>
+          streamingAnswer ? (
+            <div className="flex justify-start">
+              <div className="bg-slate-800/90 border border-indigo-500/50 text-slate-200 text-sm p-4 rounded-2xl rounded-tl-none max-w-2xl 2xl:max-w-4xl space-y-2 shadow-lg">
+                <div className="flex items-center space-x-2 text-indigo-400 text-xs font-semibold uppercase tracking-wider mb-1">
+                  <Sparkles className="w-3.5 h-3.5 animate-spin" />
+                  <span>Đang suy luận streaming qua WebSocket...</span>
+                </div>
+                <p className="leading-relaxed whitespace-pre-wrap">{streamingAnswer}</p>
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="flex justify-start animate-pulse">
+              <div className="bg-slate-800/60 border border-slate-700/50 p-4 rounded-2xl rounded-tl-none w-full max-w-md space-y-3">
+                <div className="h-4 bg-slate-700 rounded w-3/4"></div>
+                <div className="h-4 bg-slate-700 rounded w-5/6"></div>
+                <div className="h-4 bg-slate-700 rounded w-1/2"></div>
+                <div className="h-8 bg-slate-700/50 rounded w-1/3 mt-2"></div>
+              </div>
+            </div>
+          )
         )}
 
         {/* STATE 3: ERROR STATE WITH RETRY (Kiosk Ergonomics >= 48px) */}

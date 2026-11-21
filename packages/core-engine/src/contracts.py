@@ -293,4 +293,15 @@ class CloudKeyUpdateResponse(BaseModel):
     message: str
 
 
+class StreamingChunk(BaseModel):
+    """Real-time token streaming payload delivered over WebSocket."""
+    event: Literal["token", "evidence", "done", "error"]
+    token: Optional[str] = None
+    evidences: Optional[List[GroundedEvidence]] = None
+    answer: Optional[str] = None
+    elapsed_ms: Optional[float] = None
+    error: Optional[str] = None
+
+
+
 

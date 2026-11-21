@@ -291,7 +291,7 @@ class CloudRouter:
         # Extract evidence for each document and tag with document_id
         for doc_id, pages in doc_pages.items():
             for img_path, p_num in pages:
-                _, evs = self._synthesize_offline_fallback(p_num, query, engine_name)
+                _, evs = self._synthesize_fallback(p_num, query, engine_name)
                 for ev in evs:
                     tagged_ev = dict(ev)
                     tagged_ev["document_id"] = doc_id
@@ -461,3 +461,6 @@ class CloudRouter:
             evidences = []
 
         return answer, evidences
+
+    _synthesize_offline_fallback = _synthesize_fallback
+

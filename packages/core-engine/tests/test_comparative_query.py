@@ -6,6 +6,7 @@ Governed by AGENTS.md Rules 1, 13, and 14.
 
 import pytest
 from pathlib import Path
+from unittest.mock import patch
 from fastapi.testclient import TestClient
 
 import sys
@@ -79,6 +80,25 @@ def test_comparative_query_success():
     assert data["latency_ms"] > 0
 
 
+def test_comparative_query_cloud_inference_mode():
+    """Verify that comparative query works in cloud inference mode."""
+    payload = {
+        "document_ids": ["VNM_2022_COMP", "VNM_2023_COMP"],
+        "query_text": "So sánh doanh thu thuần và cơ cấu thị trường",
+        "top_k_per_doc": 1,
+        "inference_mode": "cloud",
+    }
+    res = client.post("/api/v1/query/comparative", json=payload)
+    assert res.status_code == 200, f"Cloud comparative query failed: {res.text}"
+    res_data = res.json()
+    assert res_data["document_ids"] == ["VNM_2022_COMP", "VNM_2023_COMP"]
+    assert len(res_data["comparative_metrics"]) >= 2
+    assert len(res_data["evidences"]) >= 2
+    for ev in res_data["evidences"]:
+        assert ev["document_id"] in ["VNM_2022_COMP", "VNM_2023_COMP"]
+
+
+
 def test_comparative_query_traversal_rejection():
     """Verify that path traversal in document_ids list is rejected with 400/422."""
     payload = {
@@ -118,3 +138,25 @@ def test_comparative_query_missing_document():
     res = client.post("/api/v1/query/comparative", json=payload)
     assert res.status_code == 404
     assert "not found" in res.json()["detail"].lower()
+
+
+def test_cloud_router_analyze_comparative_direct():
+    """Verify that CloudRouter analyze_comparative works offline/without keys."""
+    import asyncio
+    from cloud_router import CloudRouter
+    cr = CloudRouter()
+    doc_pages = {
+        "DOC_A": [("/tmp/fake_page1.png", 1)],
+        "DOC_B": [("/tmp/fake_page2.png", 2)],
+    }
+    with patch("cloud_router.is_path_safe", return_value=True):
+        res = asyncio.run(cr.analyze_comparative(doc_pages, "So sánh doanh thu và lợi nhuận"))
+    assert "answer" in res
+    assert "comparative_metrics" in res
+    assert len(res["comparative_metrics"]) >= 2
+    assert "evidences" in res
+    for ev in res["evidences"]:
+        assert "document_id" in ev
+        assert ev["document_id"] in ["DOC_A", "DOC_B"]
+
+

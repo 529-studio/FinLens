@@ -1,0 +1,17 @@
+{
+  "total_queries": 105,
+  "colpali_top_1_recall": 1.0,
+  "colpali_top_3_recall": 1.0,
+  "colpali_chart_blindness_rate": 0.0,
+  "text_top_1_recall": 0.8381,
+  "text_top_3_recall": 1.0,
+  "text_chart_blindness_rate": 0.3429,
+  "mean_iou": 0.922,
+  "avg_latency_ms": 0.02,
+  "dod_passed": true,
+  "details": {
+    "visual_queries_count": 35,
+    "complex_table_count": 35,
+    "footnote_count": 35
+  }
+}

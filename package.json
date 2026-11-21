@@ -8,6 +8,7 @@
     "dev:engine": "python3 packages/core-engine/src/main.py",
     "dev:addin": "npm run --prefix apps/excel dev",
     "bench:recall": "python3 benchmarks/eval_retrieval.py",
+    "bench:golden": "packages/core-engine/.venv/bin/python3 benchmarks/eval_golden_suite.py",
     "lore:status": "lore status",
     "lore:ingest": "lore ingest",
     "lore:verify": "lore verify",

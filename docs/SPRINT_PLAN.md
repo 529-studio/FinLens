@@ -119,3 +119,35 @@
 - [ ] Hiệu năng xử lý báo cáo tài chính lớn được cải thiện rõ rệt theo benchmark.
 - [ ] Toàn bộ kết quả kiểm thử được lưu trữ và bài học được ghi lại vào Lore.
 
+---
+
+## Sprint 7: Ingestion Office.js, Comparative Visual RAG & Hardened Native Desktop (Completed)
+- **Mục tiêu chính:** Hoàn thiện 1-click Ingestion trên Excel Taskpane, RAG đối chiếu đa niên độ BCTC, native packaging Tauri v2 và xuất bảng tự động.
+- **Thời lượng:** Hoàn thành (2026-11-21)
+- **Trạng thái:** 100% hoàn thành, 4 PRs (#42, #46, #47, #48) đã merge vào `dev`.
+
+---
+
+## Sprint 8: Production Readiness, Golden Dataset Benchmarks, Signing/Notarization & Streaming Inference
+- **Mục tiêu chính:** Nâng cấp FinSight đạt chuẩn phát hành thương mại (GA) với bộ benchmark 100+ BCTC thực tế, pipeline ký số và notarization cho macOS/Windows, suy luận streaming qua WebSocket, và bóc tách thuyết minh BCTC liên kết bảng tính.
+- **Thời lượng dự kiến:** 2 tuần (Sprint 8)
+- **Chủ trì kỹ thuật:** `lead-architect`, `qa-benchmark-engineer`, `rag-ml-engineer`, `excel-addin-engineer`, `frontend-engineer`
+
+### Task Breakdown & Phân Công:
+
+| Mã Task | Phân công | Mô tả công việc | Deliverables / Đầu ra |
+|:--------|:----------|:----------------|:----------------------|
+| **S8-01** | `qa-benchmark-engineer`, `rag-ml-engineer` | Golden Dataset Comprehensive Evaluation: Mở rộng benchmark 100+ BCTC kiểm toán thực tế (VNM, HPG, VCB, FPT, VIC, MSN, MWG, VHM...), đo Top-1/Top-3 recall, chart blindness rate và bounding box IoU. | `benchmarks/data/manifest_golden_100.json`, `benchmarks/eval_golden_suite.py`, báo cáo định lượng `sprint8_golden_benchmark.json`. |
+| **S8-02** | `lead-architect`, `frontend-engineer` | Production Installer Signing, Hardened Runtime & Notarization Pipeline: Thiết lập Apple Developer ID code signing, entitlements.plist hardened runtime, Apple `notarytool` stapling, và pipeline cho macOS `.dmg`/`.app`. | `apps/desktop/src-tauri/entitlements.plist`, `scripts/notarize-macos.sh`, cấu hình `tauri.conf.json` chuẩn sản xuất. |
+| **S8-03** | `rag-ml-engineer`, `frontend-engineer`, `excel-addin-engineer` | Real-Time WebSocket Streaming Inference: Triển khai endpoint `/ws/query/stream`, stream từng token từ MLX Engine & Cloud Router đến Desktop Chat và Excel Taskpane theo thời gian thực. | Endpoint `/ws/query/stream`, hook `useStreamingQuery.ts`, cập nhật progressive rendering cho ChatPanel và Excel Sidebar. |
+| **S8-04** | `rag-ml-engineer`, `excel-addin-engineer` | Consolidated BCTC Footnote Disambiguation & Formula Extraction: Tối ưu prompt VLM nhận diện và bóc tách Thuyết minh BCTC, tự động liên kết các khoản mục bảng cân đối kế toán với thuyết minh chi tiết và sinh link/comment trong Excel. | Endpoint `/api/v1/query/footnotes`, hàm `insertFinancialTableToSheet` nâng cao hỗ trợ cột Thuyết minh và comment trích dẫn. |
+| **S8-05** | `lead-architect`, `qa-benchmark-engineer` | Independent Wave Audit, Security Traversal Probing & Sprint Close Ritual: Kiểm thử bảo mật path traversal trên tất cả endpoint mới, audit UI/UX độc lập, nghiệm thu 100% test matrix và lập biên bản bàn giao Sprint 8. | `docs/reports/sprint8_report.md`, `docs/HANDOFF-s8.md`, `npm run harvest:lessons`. |
+
+### Definition of Done (DoD) Sprint 8:
+- [ ] Golden dataset benchmark đạt Top-1 Recall $\ge 85\%$, Top-3 Recall $\ge 95\%$, Chart Blindness 0.0%, và Bounding Box IoU $\ge 0.80$ trên 100+ BCTC thực tế.
+- [ ] macOS `.dmg` và `.app` được cấu hình hardened runtime và kịch bản notarization vượt qua kiểm tra của Apple Gatekeeper.
+- [ ] WebSocket streaming trả về token mượt mà không làm đơ giao diện; hiển thị trọn vẹn 3 UI States.
+- [ ] Thuyết minh BCTC được bóc tách chính xác và đính kèm vào bảng tính Excel mà không gây lỗi tham chiếu.
+- [ ] 100% test suites (Python, Vitest, Rust Cargo) vượt qua và audit subagent xác nhận `APPROVED 🟢`.
+
+

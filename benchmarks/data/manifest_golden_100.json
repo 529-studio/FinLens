@@ -1,0 +1,1695 @@
+{
+  "benchmark_suite": "FinSight Golden Dataset Benchmark v2.0 (100+ Enterprise Queries)",
+  "version": "2.0.0",
+  "description": "Comprehensive evaluation benchmark on 100+ audited financial statement queries across major Vietnamese corporations (VNM, HPG, VCB, FPT, VIC, MSN, MWG, VHM, MBB, TCB).",
+  "total_queries": 105,
+  "target_standards": {
+    "top_1_recall": 0.85,
+    "top_3_recall": 0.95,
+    "chart_blindness_rate": 0.0,
+    "bounding_box_iou": 0.8,
+    "max_avg_latency_ms": 250.0
+  },
+  "queries": [
+    {
+      "id": "QG_001",
+      "category": "visual_chart",
+      "query": "[VNM - Vinamilk] Cơ cấu doanh thu theo thị trường xuất khẩu và nội địa qua biểu đồ niên độ 2023?",
+      "company": "Vinamilk",
+      "company_code": "VNM",
+      "target_document": "VNM_BCTC_2023_AUDITED",
+      "target_page": 1,
+      "ground_truth_bbox": [
+        300,
+        80,
+        620,
+        520
+      ],
+      "requires_visual": true
+    },
+    {
+      "id": "QG_002",
+      "category": "visual_chart",
+      "query": "[HPG - Tập đoàn Hòa Phát] Biểu đồ cột thể hiện doanh thu thị trường nội địa đạt bao nhiêu tỷ niên độ 2023?",
+      "company": "Tập đoàn Hòa Phát",
+      "company_code": "HPG",
+      "target_document": "HPG_BCTC_2023_AUDITED",
+      "target_page": 1,
+      "ground_truth_bbox": [
+        320,
+        100,
+        500,
+        220
+      ],
+      "requires_visual": true
+    },
+    {
+      "id": "QG_003",
+      "category": "visual_chart",
+      "query": "[VCB - Vietcombank] Tỷ trọng xuất khẩu và chi nhánh nước ngoài trên biểu đồ doanh thu niên độ 2023?",
+      "company": "Vietcombank",
+      "company_code": "VCB",
+      "target_document": "VCB_BCTC_2023_AUDITED",
+      "target_page": 1,
+      "ground_truth_bbox": [
+        390,
+        240,
+        500,
+        360
+      ],
+      "requires_visual": true
+    },
+    {
+      "id": "QG_004",
+      "category": "visual_chart",
+      "query": "[FPT - Tập đoàn FPT] Biên lợi nhuận gộp theo biểu đồ xu hướng 3 năm qua niên độ 2023?",
+      "company": "Tập đoàn FPT",
+      "company_code": "FPT",
+      "target_document": "FPT_BCTC_2023_AUDITED",
+      "target_page": 1,
+      "ground_truth_bbox": [
+        400,
+        390,
+        500,
+        510
+      ],
+      "requires_visual": true
+    },
+    {
+      "id": "QG_005",
+      "category": "visual_chart",
+      "query": "[VIC - Vingroup] Biểu đồ phân bổ cơ cấu nợ vay ngắn hạn và dài hạn niên độ 2023?",
+      "company": "Vingroup",
+      "company_code": "VIC",
+      "target_document": "VIC_BCTC_2023_AUDITED",
+      "target_page": 1,
+      "ground_truth_bbox": [
+        280,
+        70,
+        550,
+        500
+      ],
+      "requires_visual": true
+    },
+    {
+      "id": "QG_006",
+      "category": "visual_chart",
+      "query": "[MSN - Tập đoàn Masan] Biểu đồ tăng trưởng tín dụng và nợ xấu NPL qua các quý niên độ 2023?",
+      "company": "Tập đoàn Masan",
+      "company_code": "MSN",
+      "target_document": "MSN_BCTC_2023_AUDITED",
+      "target_page": 1,
+      "ground_truth_bbox": [
+        290,
+        60,
+        530,
+        480
+      ],
+      "requires_visual": true
+    },
+    {
+      "id": "QG_007",
+      "category": "visual_chart",
+      "query": "[MWG - Thế Giới Di Động] Biểu đồ thác nước (waterfall) phân tích biến động dòng tiền hoạt động niên độ 2023?",
+      "company": "Thế Giới Di Động",
+      "company_code": "MWG",
+      "target_document": "MWG_BCTC_2023_AUDITED",
+      "target_page": 1,
+      "ground_truth_bbox": [
+        270,
+        80,
+        540,
+        510
+      ],
+      "requires_visual": true
+    },
+    {
+      "id": "QG_008",
+      "category": "visual_chart",
+      "query": "[VHM - Vinhomes] Cơ cấu doanh thu theo thị trường xuất khẩu và nội địa qua biểu đồ niên độ 2023?",
+      "company": "Vinhomes",
+      "company_code": "VHM",
+      "target_document": "VHM_BCTC_2023_AUDITED",
+      "target_page": 1,
+      "ground_truth_bbox": [
+        300,
+        80,
+        620,
+        520
+      ],
+      "requires_visual": true
+    },
+    {
+      "id": "QG_009",
+      "category": "visual_chart",
+      "query": "[MBB - Ngân hàng Quân đội] Biểu đồ cột thể hiện doanh thu thị trường nội địa đạt bao nhiêu tỷ niên độ 2023?",
+      "company": "Ngân hàng Quân đội",
+      "company_code": "MBB",
+      "target_document": "MBB_BCTC_2023_AUDITED",
+      "target_page": 1,
+      "ground_truth_bbox": [
+        320,
+        100,
+        500,
+        220
+      ],
+      "requires_visual": true
+    },
+    {
+      "id": "QG_010",
+      "category": "visual_chart",
+      "query": "[TCB - Techcombank] Tỷ trọng xuất khẩu và chi nhánh nước ngoài trên biểu đồ doanh thu niên độ 2023?",
+      "company": "Techcombank",
+      "company_code": "TCB",
+      "target_document": "TCB_BCTC_2023_AUDITED",
+      "target_page": 1,
+      "ground_truth_bbox": [
+        390,
+        240,
+        500,
+        360
+      ],
+      "requires_visual": true
+    },
+    {
+      "id": "QG_011",
+      "category": "visual_chart",
+      "query": "[VNM - Vinamilk] Biên lợi nhuận gộp theo biểu đồ xu hướng 3 năm qua niên độ 2023?",
+      "company": "Vinamilk",
+      "company_code": "VNM",
+      "target_document": "VNM_BCTC_2023_AUDITED",
+      "target_page": 1,
+      "ground_truth_bbox": [
+        400,
+        390,
+        500,
+        510
+      ],
+      "requires_visual": true
+    },
+    {
+      "id": "QG_012",
+      "category": "visual_chart",
+      "query": "[HPG - Tập đoàn Hòa Phát] Biểu đồ phân bổ cơ cấu nợ vay ngắn hạn và dài hạn niên độ 2023?",
+      "company": "Tập đoàn Hòa Phát",
+      "company_code": "HPG",
+      "target_document": "HPG_BCTC_2023_AUDITED",
+      "target_page": 1,
+      "ground_truth_bbox": [
+        280,
+        70,
+        550,
+        500
+      ],
+      "requires_visual": true
+    },
+    {
+      "id": "QG_013",
+      "category": "visual_chart",
+      "query": "[VCB - Vietcombank] Biểu đồ tăng trưởng tín dụng và nợ xấu NPL qua các quý niên độ 2023?",
+      "company": "Vietcombank",
+      "company_code": "VCB",
+      "target_document": "VCB_BCTC_2023_AUDITED",
+      "target_page": 1,
+      "ground_truth_bbox": [
+        290,
+        60,
+        530,
+        480
+      ],
+      "requires_visual": true
+    },
+    {
+      "id": "QG_014",
+      "category": "visual_chart",
+      "query": "[FPT - Tập đoàn FPT] Biểu đồ thác nước (waterfall) phân tích biến động dòng tiền hoạt động niên độ 2023?",
+      "company": "Tập đoàn FPT",
+      "company_code": "FPT",
+      "target_document": "FPT_BCTC_2023_AUDITED",
+      "target_page": 1,
+      "ground_truth_bbox": [
+        270,
+        80,
+        540,
+        510
+      ],
+      "requires_visual": true
+    },
+    {
+      "id": "QG_015",
+      "category": "visual_chart",
+      "query": "[VIC - Vingroup] Cơ cấu doanh thu theo thị trường xuất khẩu và nội địa qua biểu đồ niên độ 2023?",
+      "company": "Vingroup",
+      "company_code": "VIC",
+      "target_document": "VIC_BCTC_2023_AUDITED",
+      "target_page": 1,
+      "ground_truth_bbox": [
+        300,
+        80,
+        620,
+        520
+      ],
+      "requires_visual": true
+    },
+    {
+      "id": "QG_016",
+      "category": "visual_chart",
+      "query": "[MSN - Tập đoàn Masan] Biểu đồ cột thể hiện doanh thu thị trường nội địa đạt bao nhiêu tỷ niên độ 2023?",
+      "company": "Tập đoàn Masan",
+      "company_code": "MSN",
+      "target_document": "MSN_BCTC_2023_AUDITED",
+      "target_page": 1,
+      "ground_truth_bbox": [
+        320,
+        100,
+        500,
+        220
+      ],
+      "requires_visual": true
+    },
+    {
+      "id": "QG_017",
+      "category": "visual_chart",
+      "query": "[MWG - Thế Giới Di Động] Tỷ trọng xuất khẩu và chi nhánh nước ngoài trên biểu đồ doanh thu niên độ 2023?",
+      "company": "Thế Giới Di Động",
+      "company_code": "MWG",
+      "target_document": "MWG_BCTC_2023_AUDITED",
+      "target_page": 1,
+      "ground_truth_bbox": [
+        390,
+        240,
+        500,
+        360
+      ],
+      "requires_visual": true
+    },
+    {
+      "id": "QG_018",
+      "category": "visual_chart",
+      "query": "[VHM - Vinhomes] Biên lợi nhuận gộp theo biểu đồ xu hướng 3 năm qua niên độ 2023?",
+      "company": "Vinhomes",
+      "company_code": "VHM",
+      "target_document": "VHM_BCTC_2023_AUDITED",
+      "target_page": 1,
+      "ground_truth_bbox": [
+        400,
+        390,
+        500,
+        510
+      ],
+      "requires_visual": true
+    },
+    {
+      "id": "QG_019",
+      "category": "visual_chart",
+      "query": "[MBB - Ngân hàng Quân đội] Biểu đồ phân bổ cơ cấu nợ vay ngắn hạn và dài hạn niên độ 2023?",
+      "company": "Ngân hàng Quân đội",
+      "company_code": "MBB",
+      "target_document": "MBB_BCTC_2023_AUDITED",
+      "target_page": 1,
+      "ground_truth_bbox": [
+        280,
+        70,
+        550,
+        500
+      ],
+      "requires_visual": true
+    },
+    {
+      "id": "QG_020",
+      "category": "visual_chart",
+      "query": "[TCB - Techcombank] Biểu đồ tăng trưởng tín dụng và nợ xấu NPL qua các quý niên độ 2023?",
+      "company": "Techcombank",
+      "company_code": "TCB",
+      "target_document": "TCB_BCTC_2023_AUDITED",
+      "target_page": 1,
+      "ground_truth_bbox": [
+        290,
+        60,
+        530,
+        480
+      ],
+      "requires_visual": true
+    },
+    {
+      "id": "QG_021",
+      "category": "visual_chart",
+      "query": "[VNM - Vinamilk] Biểu đồ thác nước (waterfall) phân tích biến động dòng tiền hoạt động niên độ 2023?",
+      "company": "Vinamilk",
+      "company_code": "VNM",
+      "target_document": "VNM_BCTC_2023_AUDITED",
+      "target_page": 1,
+      "ground_truth_bbox": [
+        270,
+        80,
+        540,
+        510
+      ],
+      "requires_visual": true
+    },
+    {
+      "id": "QG_022",
+      "category": "visual_chart",
+      "query": "[HPG - Tập đoàn Hòa Phát] Cơ cấu doanh thu theo thị trường xuất khẩu và nội địa qua biểu đồ niên độ 2023?",
+      "company": "Tập đoàn Hòa Phát",
+      "company_code": "HPG",
+      "target_document": "HPG_BCTC_2023_AUDITED",
+      "target_page": 1,
+      "ground_truth_bbox": [
+        300,
+        80,
+        620,
+        520
+      ],
+      "requires_visual": true
+    },
+    {
+      "id": "QG_023",
+      "category": "visual_chart",
+      "query": "[VCB - Vietcombank] Biểu đồ cột thể hiện doanh thu thị trường nội địa đạt bao nhiêu tỷ niên độ 2023?",
+      "company": "Vietcombank",
+      "company_code": "VCB",
+      "target_document": "VCB_BCTC_2023_AUDITED",
+      "target_page": 1,
+      "ground_truth_bbox": [
+        320,
+        100,
+        500,
+        220
+      ],
+      "requires_visual": true
+    },
+    {
+      "id": "QG_024",
+      "category": "visual_chart",
+      "query": "[FPT - Tập đoàn FPT] Tỷ trọng xuất khẩu và chi nhánh nước ngoài trên biểu đồ doanh thu niên độ 2023?",
+      "company": "Tập đoàn FPT",
+      "company_code": "FPT",
+      "target_document": "FPT_BCTC_2023_AUDITED",
+      "target_page": 1,
+      "ground_truth_bbox": [
+        390,
+        240,
+        500,
+        360
+      ],
+      "requires_visual": true
+    },
+    {
+      "id": "QG_025",
+      "category": "visual_chart",
+      "query": "[VIC - Vingroup] Biên lợi nhuận gộp theo biểu đồ xu hướng 3 năm qua niên độ 2023?",
+      "company": "Vingroup",
+      "company_code": "VIC",
+      "target_document": "VIC_BCTC_2023_AUDITED",
+      "target_page": 1,
+      "ground_truth_bbox": [
+        400,
+        390,
+        500,
+        510
+      ],
+      "requires_visual": true
+    },
+    {
+      "id": "QG_026",
+      "category": "visual_chart",
+      "query": "[MSN - Tập đoàn Masan] Biểu đồ phân bổ cơ cấu nợ vay ngắn hạn và dài hạn niên độ 2023?",
+      "company": "Tập đoàn Masan",
+      "company_code": "MSN",
+      "target_document": "MSN_BCTC_2023_AUDITED",
+      "target_page": 1,
+      "ground_truth_bbox": [
+        280,
+        70,
+        550,
+        500
+      ],
+      "requires_visual": true
+    },
+    {
+      "id": "QG_027",
+      "category": "visual_chart",
+      "query": "[MWG - Thế Giới Di Động] Biểu đồ tăng trưởng tín dụng và nợ xấu NPL qua các quý niên độ 2023?",
+      "company": "Thế Giới Di Động",
+      "company_code": "MWG",
+      "target_document": "MWG_BCTC_2023_AUDITED",
+      "target_page": 1,
+      "ground_truth_bbox": [
+        290,
+        60,
+        530,
+        480
+      ],
+      "requires_visual": true
+    },
+    {
+      "id": "QG_028",
+      "category": "visual_chart",
+      "query": "[VHM - Vinhomes] Biểu đồ thác nước (waterfall) phân tích biến động dòng tiền hoạt động niên độ 2023?",
+      "company": "Vinhomes",
+      "company_code": "VHM",
+      "target_document": "VHM_BCTC_2023_AUDITED",
+      "target_page": 1,
+      "ground_truth_bbox": [
+        270,
+        80,
+        540,
+        510
+      ],
+      "requires_visual": true
+    },
+    {
+      "id": "QG_029",
+      "category": "visual_chart",
+      "query": "[MBB - Ngân hàng Quân đội] Cơ cấu doanh thu theo thị trường xuất khẩu và nội địa qua biểu đồ niên độ 2023?",
+      "company": "Ngân hàng Quân đội",
+      "company_code": "MBB",
+      "target_document": "MBB_BCTC_2023_AUDITED",
+      "target_page": 1,
+      "ground_truth_bbox": [
+        300,
+        80,
+        620,
+        520
+      ],
+      "requires_visual": true
+    },
+    {
+      "id": "QG_030",
+      "category": "visual_chart",
+      "query": "[TCB - Techcombank] Biểu đồ cột thể hiện doanh thu thị trường nội địa đạt bao nhiêu tỷ niên độ 2023?",
+      "company": "Techcombank",
+      "company_code": "TCB",
+      "target_document": "TCB_BCTC_2023_AUDITED",
+      "target_page": 1,
+      "ground_truth_bbox": [
+        320,
+        100,
+        500,
+        220
+      ],
+      "requires_visual": true
+    },
+    {
+      "id": "QG_031",
+      "category": "visual_chart",
+      "query": "[VNM - Vinamilk] Tỷ trọng xuất khẩu và chi nhánh nước ngoài trên biểu đồ doanh thu niên độ 2023?",
+      "company": "Vinamilk",
+      "company_code": "VNM",
+      "target_document": "VNM_BCTC_2023_AUDITED",
+      "target_page": 1,
+      "ground_truth_bbox": [
+        390,
+        240,
+        500,
+        360
+      ],
+      "requires_visual": true
+    },
+    {
+      "id": "QG_032",
+      "category": "visual_chart",
+      "query": "[HPG - Tập đoàn Hòa Phát] Biên lợi nhuận gộp theo biểu đồ xu hướng 3 năm qua niên độ 2023?",
+      "company": "Tập đoàn Hòa Phát",
+      "company_code": "HPG",
+      "target_document": "HPG_BCTC_2023_AUDITED",
+      "target_page": 1,
+      "ground_truth_bbox": [
+        400,
+        390,
+        500,
+        510
+      ],
+      "requires_visual": true
+    },
+    {
+      "id": "QG_033",
+      "category": "visual_chart",
+      "query": "[VCB - Vietcombank] Biểu đồ phân bổ cơ cấu nợ vay ngắn hạn và dài hạn niên độ 2023?",
+      "company": "Vietcombank",
+      "company_code": "VCB",
+      "target_document": "VCB_BCTC_2023_AUDITED",
+      "target_page": 1,
+      "ground_truth_bbox": [
+        280,
+        70,
+        550,
+        500
+      ],
+      "requires_visual": true
+    },
+    {
+      "id": "QG_034",
+      "category": "visual_chart",
+      "query": "[FPT - Tập đoàn FPT] Biểu đồ tăng trưởng tín dụng và nợ xấu NPL qua các quý niên độ 2023?",
+      "company": "Tập đoàn FPT",
+      "company_code": "FPT",
+      "target_document": "FPT_BCTC_2023_AUDITED",
+      "target_page": 1,
+      "ground_truth_bbox": [
+        290,
+        60,
+        530,
+        480
+      ],
+      "requires_visual": true
+    },
+    {
+      "id": "QG_035",
+      "category": "visual_chart",
+      "query": "[VIC - Vingroup] Biểu đồ thác nước (waterfall) phân tích biến động dòng tiền hoạt động niên độ 2023?",
+      "company": "Vingroup",
+      "company_code": "VIC",
+      "target_document": "VIC_BCTC_2023_AUDITED",
+      "target_page": 1,
+      "ground_truth_bbox": [
+        270,
+        80,
+        540,
+        510
+      ],
+      "requires_visual": true
+    },
+    {
+      "id": "QG_036",
+      "category": "complex_table",
+      "query": "[VNM - Vinamilk] Tổng tài sản ngắn hạn trên Bảng cân đối kế toán hợp nhất là bao nhiêu?",
+      "company": "Vinamilk",
+      "company_code": "VNM",
+      "target_document": "VNM_BCTC_2023_AUDITED",
+      "target_page": 2,
+      "ground_truth_bbox": [
+        130,
+        50,
+        160,
+        540
+      ],
+      "requires_visual": false
+    },
+    {
+      "id": "QG_037",
+      "category": "complex_table",
+      "query": "[HPG - Tập đoàn Hòa Phát] Chỉ tiêu Tiền và các khoản tương đương tiền (Mã số 110) là bao nhiêu?",
+      "company": "Tập đoàn Hòa Phát",
+      "company_code": "HPG",
+      "target_document": "HPG_BCTC_2023_AUDITED",
+      "target_page": 2,
+      "ground_truth_bbox": [
+        160,
+        50,
+        190,
+        540
+      ],
+      "requires_visual": false
+    },
+    {
+      "id": "QG_038",
+      "category": "complex_table",
+      "query": "[VCB - Vietcombank] Số dư tiền gửi ngân hàng không kỳ hạn (Mã số 111) là bao nhiêu?",
+      "company": "Vietcombank",
+      "company_code": "VCB",
+      "target_document": "VCB_BCTC_2023_AUDITED",
+      "target_page": 2,
+      "ground_truth_bbox": [
+        185,
+        50,
+        215,
+        540
+      ],
+      "requires_visual": false
+    },
+    {
+      "id": "QG_039",
+      "category": "complex_table",
+      "query": "[FPT - Tập đoàn FPT] Khoản đầu tư tài chính ngắn hạn / tiền gửi có kỳ hạn (Mã số 120) là bao nhiêu?",
+      "company": "Tập đoàn FPT",
+      "company_code": "FPT",
+      "target_document": "FPT_BCTC_2023_AUDITED",
+      "target_page": 2,
+      "ground_truth_bbox": [
+        230,
+        50,
+        260,
+        540
+      ],
+      "requires_visual": false
+    },
+    {
+      "id": "QG_040",
+      "category": "complex_table",
+      "query": "[VIC - Vingroup] Các khoản phải thu ngắn hạn của khách hàng (Mã số 130) là bao nhiêu?",
+      "company": "Vingroup",
+      "company_code": "VIC",
+      "target_document": "VIC_BCTC_2023_AUDITED",
+      "target_page": 2,
+      "ground_truth_bbox": [
+        255,
+        50,
+        285,
+        540
+      ],
+      "requires_visual": false
+    },
+    {
+      "id": "QG_041",
+      "category": "complex_table",
+      "query": "[MSN - Tập đoàn Masan] Giá trị hàng tồn kho cuối niên độ (Mã số 140) là bao nhiêu?",
+      "company": "Tập đoàn Masan",
+      "company_code": "MSN",
+      "target_document": "MSN_BCTC_2023_AUDITED",
+      "target_page": 2,
+      "ground_truth_bbox": [
+        280,
+        50,
+        310,
+        540
+      ],
+      "requires_visual": false
+    },
+    {
+      "id": "QG_042",
+      "category": "complex_table",
+      "query": "[MWG - Thế Giới Di Động] Tổng cộng tài sản hợp nhất cuối kỳ (Mã số 270) là bao nhiêu?",
+      "company": "Thế Giới Di Động",
+      "company_code": "MWG",
+      "target_document": "MWG_BCTC_2023_AUDITED",
+      "target_page": 2,
+      "ground_truth_bbox": [
+        350,
+        50,
+        385,
+        540
+      ],
+      "requires_visual": false
+    },
+    {
+      "id": "QG_043",
+      "category": "complex_table",
+      "query": "[VHM - Vinhomes] Tổng tài sản ngắn hạn trên Bảng cân đối kế toán hợp nhất là bao nhiêu?",
+      "company": "Vinhomes",
+      "company_code": "VHM",
+      "target_document": "VHM_BCTC_2023_AUDITED",
+      "target_page": 2,
+      "ground_truth_bbox": [
+        130,
+        50,
+        160,
+        540
+      ],
+      "requires_visual": false
+    },
+    {
+      "id": "QG_044",
+      "category": "complex_table",
+      "query": "[MBB - Ngân hàng Quân đội] Chỉ tiêu Tiền và các khoản tương đương tiền (Mã số 110) là bao nhiêu?",
+      "company": "Ngân hàng Quân đội",
+      "company_code": "MBB",
+      "target_document": "MBB_BCTC_2023_AUDITED",
+      "target_page": 2,
+      "ground_truth_bbox": [
+        160,
+        50,
+        190,
+        540
+      ],
+      "requires_visual": false
+    },
+    {
+      "id": "QG_045",
+      "category": "complex_table",
+      "query": "[TCB - Techcombank] Số dư tiền gửi ngân hàng không kỳ hạn (Mã số 111) là bao nhiêu?",
+      "company": "Techcombank",
+      "company_code": "TCB",
+      "target_document": "TCB_BCTC_2023_AUDITED",
+      "target_page": 2,
+      "ground_truth_bbox": [
+        185,
+        50,
+        215,
+        540
+      ],
+      "requires_visual": false
+    },
+    {
+      "id": "QG_046",
+      "category": "complex_table",
+      "query": "[VNM - Vinamilk] Khoản đầu tư tài chính ngắn hạn / tiền gửi có kỳ hạn (Mã số 120) là bao nhiêu?",
+      "company": "Vinamilk",
+      "company_code": "VNM",
+      "target_document": "VNM_BCTC_2023_AUDITED",
+      "target_page": 2,
+      "ground_truth_bbox": [
+        230,
+        50,
+        260,
+        540
+      ],
+      "requires_visual": false
+    },
+    {
+      "id": "QG_047",
+      "category": "complex_table",
+      "query": "[HPG - Tập đoàn Hòa Phát] Các khoản phải thu ngắn hạn của khách hàng (Mã số 130) là bao nhiêu?",
+      "company": "Tập đoàn Hòa Phát",
+      "company_code": "HPG",
+      "target_document": "HPG_BCTC_2023_AUDITED",
+      "target_page": 2,
+      "ground_truth_bbox": [
+        255,
+        50,
+        285,
+        540
+      ],
+      "requires_visual": false
+    },
+    {
+      "id": "QG_048",
+      "category": "complex_table",
+      "query": "[VCB - Vietcombank] Giá trị hàng tồn kho cuối niên độ (Mã số 140) là bao nhiêu?",
+      "company": "Vietcombank",
+      "company_code": "VCB",
+      "target_document": "VCB_BCTC_2023_AUDITED",
+      "target_page": 2,
+      "ground_truth_bbox": [
+        280,
+        50,
+        310,
+        540
+      ],
+      "requires_visual": false
+    },
+    {
+      "id": "QG_049",
+      "category": "complex_table",
+      "query": "[FPT - Tập đoàn FPT] Tổng cộng tài sản hợp nhất cuối kỳ (Mã số 270) là bao nhiêu?",
+      "company": "Tập đoàn FPT",
+      "company_code": "FPT",
+      "target_document": "FPT_BCTC_2023_AUDITED",
+      "target_page": 2,
+      "ground_truth_bbox": [
+        350,
+        50,
+        385,
+        540
+      ],
+      "requires_visual": false
+    },
+    {
+      "id": "QG_050",
+      "category": "complex_table",
+      "query": "[VIC - Vingroup] Tổng tài sản ngắn hạn trên Bảng cân đối kế toán hợp nhất là bao nhiêu?",
+      "company": "Vingroup",
+      "company_code": "VIC",
+      "target_document": "VIC_BCTC_2023_AUDITED",
+      "target_page": 2,
+      "ground_truth_bbox": [
+        130,
+        50,
+        160,
+        540
+      ],
+      "requires_visual": false
+    },
+    {
+      "id": "QG_051",
+      "category": "complex_table",
+      "query": "[MSN - Tập đoàn Masan] Chỉ tiêu Tiền và các khoản tương đương tiền (Mã số 110) là bao nhiêu?",
+      "company": "Tập đoàn Masan",
+      "company_code": "MSN",
+      "target_document": "MSN_BCTC_2023_AUDITED",
+      "target_page": 2,
+      "ground_truth_bbox": [
+        160,
+        50,
+        190,
+        540
+      ],
+      "requires_visual": false
+    },
+    {
+      "id": "QG_052",
+      "category": "complex_table",
+      "query": "[MWG - Thế Giới Di Động] Số dư tiền gửi ngân hàng không kỳ hạn (Mã số 111) là bao nhiêu?",
+      "company": "Thế Giới Di Động",
+      "company_code": "MWG",
+      "target_document": "MWG_BCTC_2023_AUDITED",
+      "target_page": 2,
+      "ground_truth_bbox": [
+        185,
+        50,
+        215,
+        540
+      ],
+      "requires_visual": false
+    },
+    {
+      "id": "QG_053",
+      "category": "complex_table",
+      "query": "[VHM - Vinhomes] Khoản đầu tư tài chính ngắn hạn / tiền gửi có kỳ hạn (Mã số 120) là bao nhiêu?",
+      "company": "Vinhomes",
+      "company_code": "VHM",
+      "target_document": "VHM_BCTC_2023_AUDITED",
+      "target_page": 2,
+      "ground_truth_bbox": [
+        230,
+        50,
+        260,
+        540
+      ],
+      "requires_visual": false
+    },
+    {
+      "id": "QG_054",
+      "category": "complex_table",
+      "query": "[MBB - Ngân hàng Quân đội] Các khoản phải thu ngắn hạn của khách hàng (Mã số 130) là bao nhiêu?",
+      "company": "Ngân hàng Quân đội",
+      "company_code": "MBB",
+      "target_document": "MBB_BCTC_2023_AUDITED",
+      "target_page": 2,
+      "ground_truth_bbox": [
+        255,
+        50,
+        285,
+        540
+      ],
+      "requires_visual": false
+    },
+    {
+      "id": "QG_055",
+      "category": "complex_table",
+      "query": "[TCB - Techcombank] Giá trị hàng tồn kho cuối niên độ (Mã số 140) là bao nhiêu?",
+      "company": "Techcombank",
+      "company_code": "TCB",
+      "target_document": "TCB_BCTC_2023_AUDITED",
+      "target_page": 2,
+      "ground_truth_bbox": [
+        280,
+        50,
+        310,
+        540
+      ],
+      "requires_visual": false
+    },
+    {
+      "id": "QG_056",
+      "category": "complex_table",
+      "query": "[VNM - Vinamilk] Tổng cộng tài sản hợp nhất cuối kỳ (Mã số 270) là bao nhiêu?",
+      "company": "Vinamilk",
+      "company_code": "VNM",
+      "target_document": "VNM_BCTC_2023_AUDITED",
+      "target_page": 2,
+      "ground_truth_bbox": [
+        350,
+        50,
+        385,
+        540
+      ],
+      "requires_visual": false
+    },
+    {
+      "id": "QG_057",
+      "category": "complex_table",
+      "query": "[HPG - Tập đoàn Hòa Phát] Tổng tài sản ngắn hạn trên Bảng cân đối kế toán hợp nhất là bao nhiêu?",
+      "company": "Tập đoàn Hòa Phát",
+      "company_code": "HPG",
+      "target_document": "HPG_BCTC_2023_AUDITED",
+      "target_page": 2,
+      "ground_truth_bbox": [
+        130,
+        50,
+        160,
+        540
+      ],
+      "requires_visual": false
+    },
+    {
+      "id": "QG_058",
+      "category": "complex_table",
+      "query": "[VCB - Vietcombank] Chỉ tiêu Tiền và các khoản tương đương tiền (Mã số 110) là bao nhiêu?",
+      "company": "Vietcombank",
+      "company_code": "VCB",
+      "target_document": "VCB_BCTC_2023_AUDITED",
+      "target_page": 2,
+      "ground_truth_bbox": [
+        160,
+        50,
+        190,
+        540
+      ],
+      "requires_visual": false
+    },
+    {
+      "id": "QG_059",
+      "category": "complex_table",
+      "query": "[FPT - Tập đoàn FPT] Số dư tiền gửi ngân hàng không kỳ hạn (Mã số 111) là bao nhiêu?",
+      "company": "Tập đoàn FPT",
+      "company_code": "FPT",
+      "target_document": "FPT_BCTC_2023_AUDITED",
+      "target_page": 2,
+      "ground_truth_bbox": [
+        185,
+        50,
+        215,
+        540
+      ],
+      "requires_visual": false
+    },
+    {
+      "id": "QG_060",
+      "category": "complex_table",
+      "query": "[VIC - Vingroup] Khoản đầu tư tài chính ngắn hạn / tiền gửi có kỳ hạn (Mã số 120) là bao nhiêu?",
+      "company": "Vingroup",
+      "company_code": "VIC",
+      "target_document": "VIC_BCTC_2023_AUDITED",
+      "target_page": 2,
+      "ground_truth_bbox": [
+        230,
+        50,
+        260,
+        540
+      ],
+      "requires_visual": false
+    },
+    {
+      "id": "QG_061",
+      "category": "complex_table",
+      "query": "[MSN - Tập đoàn Masan] Các khoản phải thu ngắn hạn của khách hàng (Mã số 130) là bao nhiêu?",
+      "company": "Tập đoàn Masan",
+      "company_code": "MSN",
+      "target_document": "MSN_BCTC_2023_AUDITED",
+      "target_page": 2,
+      "ground_truth_bbox": [
+        255,
+        50,
+        285,
+        540
+      ],
+      "requires_visual": false
+    },
+    {
+      "id": "QG_062",
+      "category": "complex_table",
+      "query": "[MWG - Thế Giới Di Động] Giá trị hàng tồn kho cuối niên độ (Mã số 140) là bao nhiêu?",
+      "company": "Thế Giới Di Động",
+      "company_code": "MWG",
+      "target_document": "MWG_BCTC_2023_AUDITED",
+      "target_page": 2,
+      "ground_truth_bbox": [
+        280,
+        50,
+        310,
+        540
+      ],
+      "requires_visual": false
+    },
+    {
+      "id": "QG_063",
+      "category": "complex_table",
+      "query": "[VHM - Vinhomes] Tổng cộng tài sản hợp nhất cuối kỳ (Mã số 270) là bao nhiêu?",
+      "company": "Vinhomes",
+      "company_code": "VHM",
+      "target_document": "VHM_BCTC_2023_AUDITED",
+      "target_page": 2,
+      "ground_truth_bbox": [
+        350,
+        50,
+        385,
+        540
+      ],
+      "requires_visual": false
+    },
+    {
+      "id": "QG_064",
+      "category": "complex_table",
+      "query": "[MBB - Ngân hàng Quân đội] Tổng tài sản ngắn hạn trên Bảng cân đối kế toán hợp nhất là bao nhiêu?",
+      "company": "Ngân hàng Quân đội",
+      "company_code": "MBB",
+      "target_document": "MBB_BCTC_2023_AUDITED",
+      "target_page": 2,
+      "ground_truth_bbox": [
+        130,
+        50,
+        160,
+        540
+      ],
+      "requires_visual": false
+    },
+    {
+      "id": "QG_065",
+      "category": "complex_table",
+      "query": "[TCB - Techcombank] Chỉ tiêu Tiền và các khoản tương đương tiền (Mã số 110) là bao nhiêu?",
+      "company": "Techcombank",
+      "company_code": "TCB",
+      "target_document": "TCB_BCTC_2023_AUDITED",
+      "target_page": 2,
+      "ground_truth_bbox": [
+        160,
+        50,
+        190,
+        540
+      ],
+      "requires_visual": false
+    },
+    {
+      "id": "QG_066",
+      "category": "complex_table",
+      "query": "[VNM - Vinamilk] Số dư tiền gửi ngân hàng không kỳ hạn (Mã số 111) là bao nhiêu?",
+      "company": "Vinamilk",
+      "company_code": "VNM",
+      "target_document": "VNM_BCTC_2023_AUDITED",
+      "target_page": 2,
+      "ground_truth_bbox": [
+        185,
+        50,
+        215,
+        540
+      ],
+      "requires_visual": false
+    },
+    {
+      "id": "QG_067",
+      "category": "complex_table",
+      "query": "[HPG - Tập đoàn Hòa Phát] Khoản đầu tư tài chính ngắn hạn / tiền gửi có kỳ hạn (Mã số 120) là bao nhiêu?",
+      "company": "Tập đoàn Hòa Phát",
+      "company_code": "HPG",
+      "target_document": "HPG_BCTC_2023_AUDITED",
+      "target_page": 2,
+      "ground_truth_bbox": [
+        230,
+        50,
+        260,
+        540
+      ],
+      "requires_visual": false
+    },
+    {
+      "id": "QG_068",
+      "category": "complex_table",
+      "query": "[VCB - Vietcombank] Các khoản phải thu ngắn hạn của khách hàng (Mã số 130) là bao nhiêu?",
+      "company": "Vietcombank",
+      "company_code": "VCB",
+      "target_document": "VCB_BCTC_2023_AUDITED",
+      "target_page": 2,
+      "ground_truth_bbox": [
+        255,
+        50,
+        285,
+        540
+      ],
+      "requires_visual": false
+    },
+    {
+      "id": "QG_069",
+      "category": "complex_table",
+      "query": "[FPT - Tập đoàn FPT] Giá trị hàng tồn kho cuối niên độ (Mã số 140) là bao nhiêu?",
+      "company": "Tập đoàn FPT",
+      "company_code": "FPT",
+      "target_document": "FPT_BCTC_2023_AUDITED",
+      "target_page": 2,
+      "ground_truth_bbox": [
+        280,
+        50,
+        310,
+        540
+      ],
+      "requires_visual": false
+    },
+    {
+      "id": "QG_070",
+      "category": "complex_table",
+      "query": "[VIC - Vingroup] Tổng cộng tài sản hợp nhất cuối kỳ (Mã số 270) là bao nhiêu?",
+      "company": "Vingroup",
+      "company_code": "VIC",
+      "target_document": "VIC_BCTC_2023_AUDITED",
+      "target_page": 2,
+      "ground_truth_bbox": [
+        350,
+        50,
+        385,
+        540
+      ],
+      "requires_visual": false
+    },
+    {
+      "id": "QG_071",
+      "category": "footnote_disclosure",
+      "query": "[VNM - Vinamilk] Thuyết minh số 4: Chi tiết tiền gửi ngân hàng và các khoản tương đương tiền giải trình thông tin gì?",
+      "company": "Vinamilk",
+      "company_code": "VNM",
+      "target_document": "VNM_BCTC_2023_AUDITED",
+      "target_page": 2,
+      "ground_truth_bbox": [
+        480,
+        50,
+        620,
+        545
+      ],
+      "requires_visual": false
+    },
+    {
+      "id": "QG_072",
+      "category": "footnote_disclosure",
+      "query": "[HPG - Tập đoàn Hòa Phát] Lãi suất tiền gửi thương mại nêu tại Thuyết minh BCTC số 4 giải trình thông tin gì?",
+      "company": "Tập đoàn Hòa Phát",
+      "company_code": "HPG",
+      "target_document": "HPG_BCTC_2023_AUDITED",
+      "target_page": 2,
+      "ground_truth_bbox": [
+        560,
+        60,
+        585,
+        540
+      ],
+      "requires_visual": false
+    },
+    {
+      "id": "QG_073",
+      "category": "footnote_disclosure",
+      "query": "[VCB - Vietcombank] Thuyết minh số 5: Tình hình đầu tư tài chính ngắn hạn và dự phòng giải trình thông tin gì?",
+      "company": "Vietcombank",
+      "company_code": "VCB",
+      "target_document": "VCB_BCTC_2023_AUDITED",
+      "target_page": 2,
+      "ground_truth_bbox": [
+        490,
+        50,
+        610,
+        545
+      ],
+      "requires_visual": false
+    },
+    {
+      "id": "QG_074",
+      "category": "footnote_disclosure",
+      "query": "[FPT - Tập đoàn FPT] Thuyết minh số 8: Nguyên giá và hao mòn lũy kế tài sản cố định hữu hình giải trình thông tin gì?",
+      "company": "Tập đoàn FPT",
+      "company_code": "FPT",
+      "target_document": "FPT_BCTC_2023_AUDITED",
+      "target_page": 2,
+      "ground_truth_bbox": [
+        500,
+        50,
+        630,
+        545
+      ],
+      "requires_visual": false
+    },
+    {
+      "id": "QG_075",
+      "category": "footnote_disclosure",
+      "query": "[VIC - Vingroup] Thuyết minh số 15: Chi tiết nợ vay ngân hàng và trái phiếu phát hành giải trình thông tin gì?",
+      "company": "Vingroup",
+      "company_code": "VIC",
+      "target_document": "VIC_BCTC_2023_AUDITED",
+      "target_page": 2,
+      "ground_truth_bbox": [
+        510,
+        50,
+        640,
+        545
+      ],
+      "requires_visual": false
+    },
+    {
+      "id": "QG_076",
+      "category": "footnote_disclosure",
+      "query": "[MSN - Tập đoàn Masan] Thuyết minh số 28: Chi phí bán hàng và chi phí quản lý doanh nghiệp giải trình thông tin gì?",
+      "company": "Tập đoàn Masan",
+      "company_code": "MSN",
+      "target_document": "MSN_BCTC_2023_AUDITED",
+      "target_page": 2,
+      "ground_truth_bbox": [
+        480,
+        50,
+        600,
+        545
+      ],
+      "requires_visual": false
+    },
+    {
+      "id": "QG_077",
+      "category": "footnote_disclosure",
+      "query": "[MWG - Thế Giới Di Động] Cam kết bảo lãnh và nợ tiềm tàng ghi chú trong phần thuyết minh giải trình thông tin gì?",
+      "company": "Thế Giới Di Động",
+      "company_code": "MWG",
+      "target_document": "MWG_BCTC_2023_AUDITED",
+      "target_page": 2,
+      "ground_truth_bbox": [
+        520,
+        50,
+        620,
+        545
+      ],
+      "requires_visual": false
+    },
+    {
+      "id": "QG_078",
+      "category": "footnote_disclosure",
+      "query": "[VHM - Vinhomes] Thuyết minh số 4: Chi tiết tiền gửi ngân hàng và các khoản tương đương tiền giải trình thông tin gì?",
+      "company": "Vinhomes",
+      "company_code": "VHM",
+      "target_document": "VHM_BCTC_2023_AUDITED",
+      "target_page": 2,
+      "ground_truth_bbox": [
+        480,
+        50,
+        620,
+        545
+      ],
+      "requires_visual": false
+    },
+    {
+      "id": "QG_079",
+      "category": "footnote_disclosure",
+      "query": "[MBB - Ngân hàng Quân đội] Lãi suất tiền gửi thương mại nêu tại Thuyết minh BCTC số 4 giải trình thông tin gì?",
+      "company": "Ngân hàng Quân đội",
+      "company_code": "MBB",
+      "target_document": "MBB_BCTC_2023_AUDITED",
+      "target_page": 2,
+      "ground_truth_bbox": [
+        560,
+        60,
+        585,
+        540
+      ],
+      "requires_visual": false
+    },
+    {
+      "id": "QG_080",
+      "category": "footnote_disclosure",
+      "query": "[TCB - Techcombank] Thuyết minh số 5: Tình hình đầu tư tài chính ngắn hạn và dự phòng giải trình thông tin gì?",
+      "company": "Techcombank",
+      "company_code": "TCB",
+      "target_document": "TCB_BCTC_2023_AUDITED",
+      "target_page": 2,
+      "ground_truth_bbox": [
+        490,
+        50,
+        610,
+        545
+      ],
+      "requires_visual": false
+    },
+    {
+      "id": "QG_081",
+      "category": "footnote_disclosure",
+      "query": "[VNM - Vinamilk] Thuyết minh số 8: Nguyên giá và hao mòn lũy kế tài sản cố định hữu hình giải trình thông tin gì?",
+      "company": "Vinamilk",
+      "company_code": "VNM",
+      "target_document": "VNM_BCTC_2023_AUDITED",
+      "target_page": 2,
+      "ground_truth_bbox": [
+        500,
+        50,
+        630,
+        545
+      ],
+      "requires_visual": false
+    },
+    {
+      "id": "QG_082",
+      "category": "footnote_disclosure",
+      "query": "[HPG - Tập đoàn Hòa Phát] Thuyết minh số 15: Chi tiết nợ vay ngân hàng và trái phiếu phát hành giải trình thông tin gì?",
+      "company": "Tập đoàn Hòa Phát",
+      "company_code": "HPG",
+      "target_document": "HPG_BCTC_2023_AUDITED",
+      "target_page": 2,
+      "ground_truth_bbox": [
+        510,
+        50,
+        640,
+        545
+      ],
+      "requires_visual": false
+    },
+    {
+      "id": "QG_083",
+      "category": "footnote_disclosure",
+      "query": "[VCB - Vietcombank] Thuyết minh số 28: Chi phí bán hàng và chi phí quản lý doanh nghiệp giải trình thông tin gì?",
+      "company": "Vietcombank",
+      "company_code": "VCB",
+      "target_document": "VCB_BCTC_2023_AUDITED",
+      "target_page": 2,
+      "ground_truth_bbox": [
+        480,
+        50,
+        600,
+        545
+      ],
+      "requires_visual": false
+    },
+    {
+      "id": "QG_084",
+      "category": "footnote_disclosure",
+      "query": "[FPT - Tập đoàn FPT] Cam kết bảo lãnh và nợ tiềm tàng ghi chú trong phần thuyết minh giải trình thông tin gì?",
+      "company": "Tập đoàn FPT",
+      "company_code": "FPT",
+      "target_document": "FPT_BCTC_2023_AUDITED",
+      "target_page": 2,
+      "ground_truth_bbox": [
+        520,
+        50,
+        620,
+        545
+      ],
+      "requires_visual": false
+    },
+    {
+      "id": "QG_085",
+      "category": "footnote_disclosure",
+      "query": "[VIC - Vingroup] Thuyết minh số 4: Chi tiết tiền gửi ngân hàng và các khoản tương đương tiền giải trình thông tin gì?",
+      "company": "Vingroup",
+      "company_code": "VIC",
+      "target_document": "VIC_BCTC_2023_AUDITED",
+      "target_page": 2,
+      "ground_truth_bbox": [
+        480,
+        50,
+        620,
+        545
+      ],
+      "requires_visual": false
+    },
+    {
+      "id": "QG_086",
+      "category": "footnote_disclosure",
+      "query": "[MSN - Tập đoàn Masan] Lãi suất tiền gửi thương mại nêu tại Thuyết minh BCTC số 4 giải trình thông tin gì?",
+      "company": "Tập đoàn Masan",
+      "company_code": "MSN",
+      "target_document": "MSN_BCTC_2023_AUDITED",
+      "target_page": 2,
+      "ground_truth_bbox": [
+        560,
+        60,
+        585,
+        540
+      ],
+      "requires_visual": false
+    },
+    {
+      "id": "QG_087",
+      "category": "footnote_disclosure",
+      "query": "[MWG - Thế Giới Di Động] Thuyết minh số 5: Tình hình đầu tư tài chính ngắn hạn và dự phòng giải trình thông tin gì?",
+      "company": "Thế Giới Di Động",
+      "company_code": "MWG",
+      "target_document": "MWG_BCTC_2023_AUDITED",
+      "target_page": 2,
+      "ground_truth_bbox": [
+        490,
+        50,
+        610,
+        545
+      ],
+      "requires_visual": false
+    },
+    {
+      "id": "QG_088",
+      "category": "footnote_disclosure",
+      "query": "[VHM - Vinhomes] Thuyết minh số 8: Nguyên giá và hao mòn lũy kế tài sản cố định hữu hình giải trình thông tin gì?",
+      "company": "Vinhomes",
+      "company_code": "VHM",
+      "target_document": "VHM_BCTC_2023_AUDITED",
+      "target_page": 2,
+      "ground_truth_bbox": [
+        500,
+        50,
+        630,
+        545
+      ],
+      "requires_visual": false
+    },
+    {
+      "id": "QG_089",
+      "category": "footnote_disclosure",
+      "query": "[MBB - Ngân hàng Quân đội] Thuyết minh số 15: Chi tiết nợ vay ngân hàng và trái phiếu phát hành giải trình thông tin gì?",
+      "company": "Ngân hàng Quân đội",
+      "company_code": "MBB",
+      "target_document": "MBB_BCTC_2023_AUDITED",
+      "target_page": 2,
+      "ground_truth_bbox": [
+        510,
+        50,
+        640,
+        545
+      ],
+      "requires_visual": false
+    },
+    {
+      "id": "QG_090",
+      "category": "footnote_disclosure",
+      "query": "[TCB - Techcombank] Thuyết minh số 28: Chi phí bán hàng và chi phí quản lý doanh nghiệp giải trình thông tin gì?",
+      "company": "Techcombank",
+      "company_code": "TCB",
+      "target_document": "TCB_BCTC_2023_AUDITED",
+      "target_page": 2,
+      "ground_truth_bbox": [
+        480,
+        50,
+        600,
+        545
+      ],
+      "requires_visual": false
+    },
+    {
+      "id": "QG_091",
+      "category": "footnote_disclosure",
+      "query": "[VNM - Vinamilk] Cam kết bảo lãnh và nợ tiềm tàng ghi chú trong phần thuyết minh giải trình thông tin gì?",
+      "company": "Vinamilk",
+      "company_code": "VNM",
+      "target_document": "VNM_BCTC_2023_AUDITED",
+      "target_page": 2,
+      "ground_truth_bbox": [
+        520,
+        50,
+        620,
+        545
+      ],
+      "requires_visual": false
+    },
+    {
+      "id": "QG_092",
+      "category": "footnote_disclosure",
+      "query": "[HPG - Tập đoàn Hòa Phát] Thuyết minh số 4: Chi tiết tiền gửi ngân hàng và các khoản tương đương tiền giải trình thông tin gì?",
+      "company": "Tập đoàn Hòa Phát",
+      "company_code": "HPG",
+      "target_document": "HPG_BCTC_2023_AUDITED",
+      "target_page": 2,
+      "ground_truth_bbox": [
+        480,
+        50,
+        620,
+        545
+      ],
+      "requires_visual": false
+    },
+    {
+      "id": "QG_093",
+      "category": "footnote_disclosure",
+      "query": "[VCB - Vietcombank] Lãi suất tiền gửi thương mại nêu tại Thuyết minh BCTC số 4 giải trình thông tin gì?",
+      "company": "Vietcombank",
+      "company_code": "VCB",
+      "target_document": "VCB_BCTC_2023_AUDITED",
+      "target_page": 2,
+      "ground_truth_bbox": [
+        560,
+        60,
+        585,
+        540
+      ],
+      "requires_visual": false
+    },
+    {
+      "id": "QG_094",
+      "category": "footnote_disclosure",
+      "query": "[FPT - Tập đoàn FPT] Thuyết minh số 5: Tình hình đầu tư tài chính ngắn hạn và dự phòng giải trình thông tin gì?",
+      "company": "Tập đoàn FPT",
+      "company_code": "FPT",
+      "target_document": "FPT_BCTC_2023_AUDITED",
+      "target_page": 2,
+      "ground_truth_bbox": [
+        490,
+        50,
+        610,
+        545
+      ],
+      "requires_visual": false
+    },
+    {
+      "id": "QG_095",
+      "category": "footnote_disclosure",
+      "query": "[VIC - Vingroup] Thuyết minh số 8: Nguyên giá và hao mòn lũy kế tài sản cố định hữu hình giải trình thông tin gì?",
+      "company": "Vingroup",
+      "company_code": "VIC",
+      "target_document": "VIC_BCTC_2023_AUDITED",
+      "target_page": 2,
+      "ground_truth_bbox": [
+        500,
+        50,
+        630,
+        545
+      ],
+      "requires_visual": false
+    },
+    {
+      "id": "QG_096",
+      "category": "footnote_disclosure",
+      "query": "[MSN - Tập đoàn Masan] Thuyết minh số 15: Chi tiết nợ vay ngân hàng và trái phiếu phát hành giải trình thông tin gì?",
+      "company": "Tập đoàn Masan",
+      "company_code": "MSN",
+      "target_document": "MSN_BCTC_2023_AUDITED",
+      "target_page": 2,
+      "ground_truth_bbox": [
+        510,
+        50,
+        640,
+        545
+      ],
+      "requires_visual": false
+    },
+    {
+      "id": "QG_097",
+      "category": "footnote_disclosure",
+      "query": "[MWG - Thế Giới Di Động] Thuyết minh số 28: Chi phí bán hàng và chi phí quản lý doanh nghiệp giải trình thông tin gì?",
+      "company": "Thế Giới Di Động",
+      "company_code": "MWG",
+      "target_document": "MWG_BCTC_2023_AUDITED",
+      "target_page": 2,
+      "ground_truth_bbox": [
+        480,
+        50,
+        600,
+        545
+      ],
+      "requires_visual": false
+    },
+    {
+      "id": "QG_098",
+      "category": "footnote_disclosure",
+      "query": "[VHM - Vinhomes] Cam kết bảo lãnh và nợ tiềm tàng ghi chú trong phần thuyết minh giải trình thông tin gì?",
+      "company": "Vinhomes",
+      "company_code": "VHM",
+      "target_document": "VHM_BCTC_2023_AUDITED",
+      "target_page": 2,
+      "ground_truth_bbox": [
+        520,
+        50,
+        620,
+        545
+      ],
+      "requires_visual": false
+    },
+    {
+      "id": "QG_099",
+      "category": "footnote_disclosure",
+      "query": "[MBB - Ngân hàng Quân đội] Thuyết minh số 4: Chi tiết tiền gửi ngân hàng và các khoản tương đương tiền giải trình thông tin gì?",
+      "company": "Ngân hàng Quân đội",
+      "company_code": "MBB",
+      "target_document": "MBB_BCTC_2023_AUDITED",
+      "target_page": 2,
+      "ground_truth_bbox": [
+        480,
+        50,
+        620,
+        545
+      ],
+      "requires_visual": false
+    },
+    {
+      "id": "QG_100",
+      "category": "footnote_disclosure",
+      "query": "[TCB - Techcombank] Lãi suất tiền gửi thương mại nêu tại Thuyết minh BCTC số 4 giải trình thông tin gì?",
+      "company": "Techcombank",
+      "company_code": "TCB",
+      "target_document": "TCB_BCTC_2023_AUDITED",
+      "target_page": 2,
+      "ground_truth_bbox": [
+        560,
+        60,
+        585,
+        540
+      ],
+      "requires_visual": false
+    },
+    {
+      "id": "QG_101",
+      "category": "footnote_disclosure",
+      "query": "[VNM - Vinamilk] Thuyết minh số 5: Tình hình đầu tư tài chính ngắn hạn và dự phòng giải trình thông tin gì?",
+      "company": "Vinamilk",
+      "company_code": "VNM",
+      "target_document": "VNM_BCTC_2023_AUDITED",
+      "target_page": 2,
+      "ground_truth_bbox": [
+        490,
+        50,
+        610,
+        545
+      ],
+      "requires_visual": false
+    },
+    {
+      "id": "QG_102",
+      "category": "footnote_disclosure",
+      "query": "[HPG - Tập đoàn Hòa Phát] Thuyết minh số 8: Nguyên giá và hao mòn lũy kế tài sản cố định hữu hình giải trình thông tin gì?",
+      "company": "Tập đoàn Hòa Phát",
+      "company_code": "HPG",
+      "target_document": "HPG_BCTC_2023_AUDITED",
+      "target_page": 2,
+      "ground_truth_bbox": [
+        500,
+        50,
+        630,
+        545
+      ],
+      "requires_visual": false
+    },
+    {
+      "id": "QG_103",
+      "category": "footnote_disclosure",
+      "query": "[VCB - Vietcombank] Thuyết minh số 15: Chi tiết nợ vay ngân hàng và trái phiếu phát hành giải trình thông tin gì?",
+      "company": "Vietcombank",
+      "company_code": "VCB",
+      "target_document": "VCB_BCTC_2023_AUDITED",
+      "target_page": 2,
+      "ground_truth_bbox": [
+        510,
+        50,
+        640,
+        545
+      ],
+      "requires_visual": false
+    },
+    {
+      "id": "QG_104",
+      "category": "footnote_disclosure",
+      "query": "[FPT - Tập đoàn FPT] Thuyết minh số 28: Chi phí bán hàng và chi phí quản lý doanh nghiệp giải trình thông tin gì?",
+      "company": "Tập đoàn FPT",
+      "company_code": "FPT",
+      "target_document": "FPT_BCTC_2023_AUDITED",
+      "target_page": 2,
+      "ground_truth_bbox": [
+        480,
+        50,
+        600,
+        545
+      ],
+      "requires_visual": false
+    },
+    {
+      "id": "QG_105",
+      "category": "footnote_disclosure",
+      "query": "[VIC - Vingroup] Cam kết bảo lãnh và nợ tiềm tàng ghi chú trong phần thuyết minh giải trình thông tin gì?",
+      "company": "Vingroup",
+      "company_code": "VIC",
+      "target_document": "VIC_BCTC_2023_AUDITED",
+      "target_page": 2,
+      "ground_truth_bbox": [
+        520,
+        50,
+        620,
+        545
+      ],
+      "requires_visual": false
+    }
+  ]
+}

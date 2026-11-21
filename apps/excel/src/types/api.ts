@@ -28,3 +28,20 @@ export interface ActiveDocumentState {
   errorMessage?: string;
 }
 
+export interface FinancialTableData {
+  title?: string;
+  headers: string[];
+  rows: (string | number)[][];
+  includeTotalRow?: boolean;
+  sourceDocId: string;
+  sourcePage: number;
+}
+
+export interface TableExportResult {
+  success: boolean;
+  insertedCellsCount: number;
+  originAddress: string;
+  auditComment: string;
+}
+
+

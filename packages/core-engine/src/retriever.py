@@ -95,3 +95,15 @@ class VisualRetriever:
         # Return all other pages in the document as linked context
         linked = [p for p in all_page_nums if p != primary_page]
         return [primary_page] + linked
+
+    def comparative_search(self, document_ids: List[str], query: str, top_k_per_doc: int = 1) -> Dict[str, List[int]]:
+        """
+        Executes Late-Interaction visual search across multiple document indices.
+        Returns a mapping of document_id -> list of candidate page numbers (1-indexed).
+        """
+        results: Dict[str, List[int]] = {}
+        for doc_id in document_ids:
+            pages = self.search(doc_id, query, top_k=top_k_per_doc)
+            results[doc_id] = pages
+        return results
+

@@ -8,15 +8,18 @@ import {
   QueryRequestDTO,
   QueryResponseDTO,
   GroundedEvidenceDTO,
+  ComparativeQueryRequestDTO,
+  ComparativeQueryResponseDTO,
   UIState,
 } from '../types/visual_rag.types';
-import { fetchQuery, ApiError } from '../api/visual_rag.fetch';
+import { fetchQuery, fetchComparativeQuery, ApiError } from '../api/visual_rag.fetch';
 
 export function useVisualRag(documentId: string) {
   const [state, setState] = useState<UIState>('idle');
   const [error, setError] = useState<string | null>(null);
   const [activeEvidence, setActiveEvidence] = useState<GroundedEvidenceDTO | null>(null);
   const [history, setHistory] = useState<QueryResponseDTO[]>([]);
+  const [comparativeHistory, setComparativeHistory] = useState<ComparativeQueryResponseDTO[]>([]);
   const abortControllerRef = useRef<AbortController | null>(null);
 
   const ask = useCallback(
@@ -57,6 +60,43 @@ export function useVisualRag(documentId: string) {
     [documentId]
   );
 
+  const askComparative = useCallback(
+    async (documentIds: string[], queryText: string, mode: 'auto' | 'local' | 'cloud' = 'auto') => {
+      if (!queryText.trim() || documentIds.length < 2) return;
+
+      setState('loading');
+      setError(null);
+
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      abortControllerRef.current = new AbortController();
+
+      try {
+        const payload: ComparativeQueryRequestDTO = {
+          document_ids: documentIds,
+          query_text: queryText,
+          top_k_per_doc: 1,
+          inference_mode: mode,
+        };
+        const response = await fetchComparativeQuery(payload, abortControllerRef.current.signal);
+
+        setComparativeHistory((prev) => [...prev, response]);
+        setState('success');
+
+        if (response.evidences.length > 0) {
+          setActiveEvidence(response.evidences[0]);
+        }
+      } catch (err: any) {
+        if (err.name === 'AbortError') return;
+        const msg = err instanceof ApiError ? err.message : 'Lỗi truy vấn so sánh đa tài liệu';
+        setError(msg);
+        setState('error');
+      }
+    },
+    []
+  );
+
   const focusEvidence = useCallback((evidence: GroundedEvidenceDTO) => {
     setActiveEvidence(evidence);
   }, []);
@@ -70,8 +110,10 @@ export function useVisualRag(documentId: string) {
     state,
     error,
     history,
+    comparativeHistory,
     activeEvidence,
     ask,
+    askComparative,
     focusEvidence,
     clearError,
   };

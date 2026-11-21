@@ -36,6 +36,8 @@ from contracts import (
     CloudKeyUpdateResponse,
     CacheStatsResponse,
     CacheClearRequest,
+    ComparativeQueryRequest,
+    ComparativeQueryResponse,
 )
 from renderer import PdfRenderer
 from retriever import VisualRetriever
@@ -434,6 +436,86 @@ async def query_financial_document(req: QueryRequest):
         latency_ms=round(duration_ms, 2),
         cached=False,
     )
+
+
+@app.post("/api/v1/query/comparative", response_model=ComparativeQueryResponse)
+async def query_comparative_documents(req: ComparativeQueryRequest):
+    """
+    Executes cross-document comparative analysis across multiple fiscal statements (e.g. BCTC 2022 vs 2023).
+    Extracts multi-index candidate pages, synthesizes YoY growth and margin shifts, and grounds evidence per document.
+    """
+    start_time = time.time()
+
+    # 1. Verify all target documents exist in LanceDB store
+    for doc_id in req.document_ids:
+        pages = retriever.store.get_pages(doc_id)
+        if not pages:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Document '{doc_id}' not found in index. Please ingest it first."
+            )
+
+    # 2. Multi-Index Retrieval across all target document IDs
+    retrieved_pages_map = retriever.comparative_search(
+        req.document_ids,
+        req.query_text,
+        top_k_per_doc=req.top_k_per_doc
+    )
+
+    # 3. Assemble document pages mapping with image paths
+    doc_pages: Dict[str, List[Tuple[str, int]]] = {}
+    for doc_id, page_nums in retrieved_pages_map.items():
+        stored_pages = retriever.store.get_pages(doc_id)
+        page_dict = {p["page_number"]: p["image_path"] for p in stored_pages}
+        doc_pages[doc_id] = []
+        for p_num in page_nums:
+            img_path = page_dict.get(p_num)
+            if img_path:
+                doc_pages[doc_id].append((img_path, p_num))
+
+    # 4. Dispatch comparative visual inference to router
+    try:
+        vlm_res = await router.analyze_comparative(
+            doc_pages=doc_pages,
+            query=req.query_text,
+            preferred_mode=req.inference_mode,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Comparative inference failed: {str(e)}")
+
+    duration_ms = (time.time() - start_time) * 1000.0
+
+    evidences = [
+        GroundedEvidence(
+            page_number=e["page_number"],
+            bounding_box=BoundingBox(
+                ymin=e["ymin"],
+                xmin=e["xmin"],
+                ymax=e["ymax"],
+                xmax=e["xmax"],
+            ),
+            label=e["label"],
+            extracted_value=e.get("extracted_value"),
+            confidence=e["confidence"],
+            document_id=e.get("document_id"),
+        )
+        for e in vlm_res.get("evidences", [])
+    ]
+
+    return ComparativeQueryResponse(
+        document_ids=req.document_ids,
+        query_text=req.query_text,
+        answer=vlm_res["answer"],
+        comparative_metrics=vlm_res.get("comparative_metrics", []),
+        evidences=evidences,
+        retrieved_pages=retrieved_pages_map,
+        engine_used=vlm_res["engine"],
+        latency_ms=round(duration_ms, 2),
+    )
+
+
 
 
 @app.get("/api/v1/cache/stats", response_model=CacheStatsResponse)

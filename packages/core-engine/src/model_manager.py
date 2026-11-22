@@ -13,7 +13,7 @@ import re
 import socket
 import logging
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from dotenv import load_dotenv
 
 # Enforce relative path for .env (529 standard: env-and-auth-ops-debugging)
@@ -25,6 +25,37 @@ logger = logging.getLogger("finsight.model_manager")
 
 DEFAULT_MODEL_ID = "mlx-community/Qwen2.5-VL-7B-Instruct-4bit"
 DEFAULT_CACHE_DIR = Path("~/.finsight/models").expanduser().resolve()
+
+QUANTIZED_REGISTRY: Dict[str, Dict[str, Any]] = {
+    "mlx-community/Qwen2.5-VL-7B-Instruct-4bit": {
+        "quantization": "4bit",
+        "precision": "int4",
+        "estimated_size_gb": 4.5,
+        "memory_ceiling_gb": 6.0,
+        "family": "vlm",
+    },
+    "mlx-community/Qwen2.5-VL-7B-Instruct-8bit": {
+        "quantization": "8bit",
+        "precision": "int8",
+        "estimated_size_gb": 8.2,
+        "memory_ceiling_gb": 10.0,
+        "family": "vlm",
+    },
+    "mlx-community/ColPali-v1.2-4bit": {
+        "quantization": "4bit",
+        "precision": "int4",
+        "estimated_size_gb": 2.2,
+        "memory_ceiling_gb": 4.0,
+        "family": "retrieval",
+    },
+    "mlx-community/ColPali-v1.2-8bit": {
+        "quantization": "8bit",
+        "precision": "int8",
+        "estimated_size_gb": 3.8,
+        "memory_ceiling_gb": 6.0,
+        "family": "retrieval",
+    },
+}
 
 try:
     from huggingface_hub import snapshot_download
@@ -89,20 +120,47 @@ class ModelManager:
         return has_config or has_weights
 
     def get_model_info(self, model_id: Optional[str] = None) -> Dict[str, Any]:
-        """Provides metadata, estimated footprint, and cache state."""
+        """Provides metadata, estimated footprint, quantization type, and cache state."""
         mid = model_id or self.default_model_id
         model_dir = self.get_model_dir(mid)
         cached = self.is_cached(mid)
 
+        reg_info = QUANTIZED_REGISTRY.get(mid)
+        if reg_info:
+            quant = reg_info["quantization"]
+            precision = reg_info["precision"]
+            family = reg_info["family"]
+            size_gb = reg_info["estimated_size_gb"]
+            ceiling_gb = reg_info["memory_ceiling_gb"]
+        else:
+            is_8bit = "8bit" in mid.lower() or "-8b" in mid.lower()
+            quant = "8bit" if is_8bit else "4bit"
+            precision = "int8" if is_8bit else "int4"
+            family = "retrieval" if "colpali" in mid.lower() else "vlm"
+            size_gb = 8.2 if is_8bit else 4.5
+            ceiling_gb = 10.0 if is_8bit else 6.0
+
         return {
             "model_id": mid,
-            "quantization": "4bit",
-            "estimated_size_gb": 4.5,
-            "memory_ceiling_gb": 6.0,
+            "quantization": quant,
+            "precision": precision,
+            "family": family,
+            "estimated_size_gb": size_gb,
+            "memory_ceiling_gb": ceiling_gb,
             "is_cached": cached,
             "cache_dir": str(model_dir),
             "offline_ready": cached,
         }
+
+    def list_supported_quantized_models(self) -> List[Dict[str, Any]]:
+        """Returns list of supported models across 4-bit and 8-bit quantizations."""
+        models = []
+        for mid, info in QUANTIZED_REGISTRY.items():
+            entry = dict(info)
+            entry["model_id"] = mid
+            entry["is_cached"] = self.is_cached(mid)
+            models.append(entry)
+        return models
 
     def is_offline(self) -> bool:
         """Detects whether offline mode is active or huggingface.co is unreachable."""

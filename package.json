@@ -9,6 +9,7 @@
     "dev:addin": "npm run --prefix apps/excel dev",
     "bench:recall": "python3 benchmarks/eval_retrieval.py",
     "bench:golden": "packages/core-engine/.venv/bin/python3 benchmarks/eval_golden_suite.py",
+    "bench:regression": "packages/core-engine/.venv/bin/python3 benchmarks/eval_golden_suite.py --baseline benchmarks/results/sprint8_golden_benchmark.json --fail-on-regression",
     "lore:status": "lore status",
     "lore:ingest": "lore ingest",
     "lore:verify": "lore verify",

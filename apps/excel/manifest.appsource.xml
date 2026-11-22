@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<OfficeApp xmlns="http://schemas.microsoft.com/office/appforoffice/1.1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="TaskPaneApp">
+  <Id>529e0001-f187-4d7a-8f52-529529529002</Id>
+  <Version>1.0.0.0</Version>
+  <ProviderName>529 Studio</ProviderName>
+  <DefaultLocale>en-US</DefaultLocale>
+  <DisplayName DefaultValue="FinTrace for Excel" />
+  <Description DefaultValue="Financial statement verification, visual grounding, and footnote audit trail add-in for Microsoft Excel." />
+  <IconUrl DefaultValue="https://fintrace.529studio.site/assets/icon-32.png" />
+  <HighResolutionIconUrl DefaultValue="https://fintrace.529studio.site/assets/icon-64.png" />
+  <SupportUrl DefaultValue="https://fintrace.529studio.site/support" />
+  <AppDomains>
+    <AppDomain>https://fintrace.529studio.site</AppDomain>
+    <AppDomain>https://api.fintrace.529studio.site</AppDomain>
+  </AppDomains>
+  <Hosts>
+    <Host Name="Workbook" />
+  </Hosts>
+  <DefaultSettings>
+    <SourceLocation DefaultValue="https://fintrace.529studio.site/taskpane.html" />
+  </DefaultSettings>
+  <Permissions>ReadWriteDocument</Permissions>
+</OfficeApp>

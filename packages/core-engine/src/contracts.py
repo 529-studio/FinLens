@@ -338,6 +338,83 @@ class FootnoteQueryResponse(BaseModel):
     elapsed_ms: float
 
 
+# ============================================================================
+# Multi-Page Table Stitching Contracts (ADR-004, Task S10-02)
+# ============================================================================
+
+class TableColumnDTO(BaseModel):
+    """Normalized column definition in a financial statement table."""
+    key: str = Field(..., description="Normalized identifier (e.g. 'line_item', 'code', 'footnote', 'ending_balance')")
+    header: str = Field(..., description="Original column header text")
+    index: int = Field(..., ge=0, description="0-indexed column position")
+    data_type: Literal["text", "code", "numeric", "footnote"] = Field("text", description="Inferred column data type")
+    bounding_box: Optional[BoundingBox] = Field(None, description="Bounding box of column header if detected")
+
+
+class FragmentRowDTO(BaseModel):
+    """Single raw table row extracted from a specific page."""
+    cells: List[str] = Field(..., description="Raw text of each cell in the row")
+    bounding_box: Optional[BoundingBox] = Field(None, description="Visual coordinates on source page")
+    page_number: Optional[int] = Field(None, ge=1, description="Page number of the row")
+
+
+class TableFragmentDTO(BaseModel):
+    """Table fragment detected on a single page of a multi-page filing."""
+    page_number: int = Field(..., ge=1, description="1-indexed source PDF page number")
+    headers: Optional[List[str]] = Field(None, description="Optional explicit column headers on this page")
+    rows: List[FragmentRowDTO] = Field(..., description="Raw rows extracted on this page")
+    bounding_box: Optional[BoundingBox] = Field(None, description="Overall bounding box of table fragment on page")
+    has_repeated_header: bool = Field(False, description="Flag indicating first row is a repeated header")
+
+
+class TableRowDTO(BaseModel):
+    """Unified row in a stitched multi-page financial statement table."""
+    row_index: int = Field(..., ge=0, description="0-indexed global sequence in stitched table")
+    page_number: int = Field(..., ge=1, description="Source page number where this row resides")
+    cells: Dict[str, str] = Field(default_factory=dict, description="Column key to cell string value")
+    raw_cells: List[str] = Field(default_factory=list, description="Ordered cell values matching columns")
+    bounding_box: BoundingBox = Field(..., description="Visual coordinates for grounding on source page")
+    is_total: bool = Field(False, description="Whether row is a summary or total row")
+    is_section: bool = Field(False, description="Whether row is a section header (e.g. A. TÀI SẢN NGẮN HẠN)")
+    code: Optional[str] = Field(None, description="Extracted line item code (e.g. 100, 110)")
+    footnote: Optional[str] = Field(None, description="Extracted footnote reference")
+
+
+class MultiPageTableDTO(BaseModel):
+    """Unified multi-page financial statement table stitched across consecutive pages."""
+    document_id: str = Field(..., description="Source document identifier")
+    table_name: str = Field(..., description="Name of financial statement (e.g. Balance Sheet)")
+    spanned_pages: List[int] = Field(..., min_length=1, description="List of 1-indexed pages this table spans")
+    columns: List[TableColumnDTO] = Field(..., description="Aligned table columns")
+    rows: List[TableRowDTO] = Field(..., description="Stitched rows with visual grounding")
+    total_rows: int = Field(..., ge=0, description="Total number of data rows in stitched table")
+    stitched_from_fragments_count: int = Field(..., ge=1, description="Number of page fragments stitched")
+    confidence: float = Field(..., ge=0.0, le=1.0, description="Stitching alignment confidence score")
+    metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional table metadata")
+
+
+class TableStitchRequest(BaseModel):
+    """Request payload to stitch multi-page table fragments into a unified table."""
+    document_id: str = Field(..., description="Document identifier")
+    table_name: Optional[str] = Field("Financial Statement Table", description="Table title")
+    fragments: List[TableFragmentDTO] = Field(..., min_length=1, description="List of page table fragments")
+
+    @field_validator("document_id")
+    @classmethod
+    def sanitize_doc_id(cls, v: str):
+        if not re.match(r"^[a-zA-Z0-9_\-]+$", v) or ".." in v or len(v) > 64:
+            raise ValueError("Access denied: Invalid or malicious document_id")
+        return v
+
+
+class TableStitchResponse(BaseModel):
+    """Response payload containing unified multi-page table and performance metrics."""
+    document_id: str
+    table: MultiPageTableDTO
+    elapsed_ms: float
+
+
+
 
 
 

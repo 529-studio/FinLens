@@ -270,6 +270,17 @@
   - *Căn chỉnh cột đa tiêu chí (Heuristic & Data Affinity):* Khi số lượng hoặc thứ tự cột thay đổi giữa các trang, thuật toán kết hợp so khớp tên tiêu đề và phân tích kiểu dữ liệu thực tế của cột (Mã số dạng 3 chữ số, Thuyết minh dạng `V.xx`, Giá trị tiền tệ có dấu chấm/phẩy, Diễn giải văn bản) để ánh xạ chính xác vào lược đồ bảng cơ sở.
   - *Nối dòng phân tách (Split-Row Concatenation):* Tự động phát hiện dòng cuối trang N chỉ có diễn giải mà thiếu số liệu, kết hợp với dòng đầu trang N+1 để hợp nhất thành một dòng hoàn chỉnh, đồng thời bảo toàn `page_number` và `bounding_box` cho visual grounding (ADR-003).
 
+---
+
+### Bài học 27: Kiến Trúc Phân Quyền Vai Trò (Enterprise RBAC) & Nhật Ký Kiểm Toán Chống Can Thiệp (Tamper-Evident SHA-256 Chaining)
+- **Bối cảnh & Thách thức:** Khi triển khai FinTrace vào môi trường ngân hàng doanh nghiệp (BIDV, Vietcombank, Techcombank), các phòng ban kiểm toán nội bộ và an ninh thông tin yêu cầu mô hình phân quyền chặt chẽ (Admin, Senior Auditor, Junior Analyst, Read-Only Reviewer). Đồng thời, toàn bộ nhật ký truy vết truy cập và xuất dữ liệu tài chính phải đảm bảo tính toàn vẹn tuyệt đối (chống can thiệp / tamper-evident), không một ai (kể cả quản trị viên hệ thống) có thể sửa hoặc xóa một dòng log mà không bị phát hiện.
+- **Giải pháp chuẩn hóa (Sprint 10 - Task S10-03):**
+  - *JWT HS256 Zero-Dependency:* Triển khai thuật toán ký và xác thực JWT HS256 hoàn toàn bằng thư viện chuẩn Python (`hmac`, `hashlib`, `base64`, `json`), loại bỏ 100% rủi ro phụ thuộc bên ngoài và lỗ hổng chuỗi cung ứng.
+  - *Cơ chế Fail-Closed kép (Nginx Edge & FastAPI Dependency):* Cấu hình Nginx gateway (`rbac-gateway.conf`) chặn ngay từ tầng ngoài các request không có Bearer token nhắm vào endpoint quản trị/kiểm toán. Ở tầng backend, dependency `require_permission` kiểm tra ma trận quyền và chặn đứng `403 Forbidden` đối với vai trò không hợp lệ.
+  - *Mô hình SHA-256 Event Chaining:* Mỗi bản ghi audit log được liên kết mật mã với bản ghi liền trước thông qua `prev_hash` và băm chuỗi JSON chuẩn hóa (`canonical_json`). Thuật toán `verify_chain` duyệt từ genesis hash (`0*64`) đến đuôi log để chứng minh tính toàn vẹn 100%. Bất kỳ hành vi sửa đổi, xóa dòng hay đảo thứ tự đều làm gãy chuỗi băm ngay lập tức.
+  - *Khử rò rỉ dữ liệu nhạy cảm (Zero-Leak Redaction):* Trước khi ghi vào log đĩa, mọi trường chứa từ khóa `key`, `secret`, `password`, `token` đều tự động bị che chắn thành `[REDACTED]`.
+
+
 
 
 

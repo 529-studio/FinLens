@@ -292,6 +292,17 @@
     - Máy RAM 24GB/32GB/64GB: 4-bit làm mặc định cho phân tích thường nhật, cho phép chuyển sang 8-bit (`MEMORY_CEILING_GB = 10.0`) khi thực hiện các cuộc kiểm toán pháp y chuyên sâu (deep forensic audit).
   - *Bảo vệ tràn bộ nhớ động (Dynamic Memory Ceiling):* `MLXInferenceEngine` tự động phát hiện cấu hình quantization được nạp để kích hoạt trần bộ nhớ tương ứng (6.0GB hoặc 10.0GB), chủ động ném lỗi `MemoryCeilingExceededError` trước khi hệ điều hành macOS buộc dừng tiến trình.
 
+---
+
+### Bài học 29: Trình Đánh Giá Công Thức AST Khử Eval, Đồ Thị Phụ Thuộc Ô Excel & Công Thái Học Kiosk
+- **Bối cảnh & Thách thức:** Chuyên viên phân tích tài chính sử dụng tiện ích bổ sung Excel (Add-in) cần thực hiện phân tích độ nhạy (Sensitivity Analysis) động trên các mô hình tài chính phức tạp: thay đổi tham số dẫn dắt (tỷ lệ tăng trưởng doanh thu, biên lợi nhuận, WACC) bằng slider tương tác và lập tức nhìn thấy tác động lan truyền đến doanh thu, lợi nhuận gộp và lợi nhuận ròng. Thách thức lớn nhất là: cấm tuyệt đối dùng `eval()` hoặc `new Function()` để tính công thức (vi phạm nghiêm ngặt AGENTS.md Rule 13.B về Injection Defense), phải phát hiện được tham chiếu vòng tròn (Circular References) để tránh treo trình duyệt, và giao diện phải tuân thủ công thái học Kiosk ($\ge 48\text{px}$) với 0 emoji thô (Rule 15).
+- **Giải pháp chuẩn hóa (Sprint 10 - Task S10-05):**
+  - *Bộ phân tích cú pháp đệ quy xuống (Recursive Descent AST Parser - Zero eval):* Triển khai bộ phân tích cú pháp công thức tài chính hoàn toàn bằng AST thuần, hỗ trợ đầy đủ toán tử số học (`+`, `-`, `*`, `/`, `^`, `%`), dấu ngoặc đơn lồng nhau, tra cứu địa chỉ ô/dải ô (`B5`, `B2:B9`), và các hàm tài chính phổ biến (`SUM`, `AVERAGE`, `MIN`, `MAX`, `ROUND`, `PRODUCT`). Cơ chế chia cho 0 chủ động ném lỗi kiểm soát trước khi làm hỏng số liệu `NaN` / `Infinity`.
+  - *Đồ thị phụ thuộc 2 chiều & DFS 3 màu phát hiện chu trình:* Xây dựng đồ thị hướng 2 chiều lưu trữ cả tiền lệ (`precedents`) và hậu duệ (`dependents`). Dùng thuật toán DFS 3 màu (0: chưa duyệt, 1: đang duyệt, 2: đã duyệt) phát hiện tức thời chu trình tham chiếu vòng tròn, và giải thuật sắp xếp topo (Kahn's algorithm) để xác định đúng thứ tự tính toán xuôi dòng khi tham số dẫn dắt thay đổi.
+  - *Chuẩn hóa sai số dấu phẩy động IEEE-754:* Các phép nhân dải số thập phân (ví dụ: `50000 * 1.1 = 55000.00000000001`) được làm tròn an toàn qua `Math.round((val + Number.EPSILON) * 1e9) / 1e9`, bảo đảm tính toán chính xác tuyệt đối.
+  - *Công thái học Kiosk $\ge 48\text{px}$ & 3 trạng thái giao diện:* Toàn bộ slider, nút bước nhảy, nút hoàn tác, chip kịch bản định sẵn (Bi quan, Thận trọng, Lạc quan, Căng thẳng), nút mở ngăn kéo kiểm toán và nút đồng bộ vào sheet đều đạt chuẩn chiều cao tối thiểu 48px, 100% icon vector SVG Lucide React, và xử lý mượt mà cả 3 trạng thái Skeleton Loading, Error với nút Thử lại, và Actionable Empty state.
+
+
 
 
 

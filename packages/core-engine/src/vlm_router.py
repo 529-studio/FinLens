@@ -179,7 +179,8 @@ class VlmRouter:
         pages: List[Tuple[str, int]],
         query: str,
         preferred_mode: str = "auto",
-        chunk_words_count: int = 4
+        chunk_words_count: int = 4,
+        document_id: Optional[str] = None,
     ):
         """
         Asynchronously streams inference token chunks followed by evidence and completion events.
@@ -201,8 +202,18 @@ class VlmRouter:
         # Yield visual grounding bounding box evidence
         yield {"event": "evidence", "evidences": evidences}
 
+        # Yield matching footnote citations if available
+        footnotes = []
+        if document_id:
+            try:
+                footnotes = self.extract_footnotes(document_id, [query])
+                if footnotes:
+                    yield {"event": "footnote", "footnotes": footnotes}
+            except Exception as e:
+                logger.debug("Footnote extraction in stream skipped: %s", e)
+
         # Yield completion done event
-        yield {"event": "done", "answer": answer, "elapsed_ms": latency_ms}
+        yield {"event": "done", "answer": answer, "elapsed_ms": latency_ms, "footnotes": footnotes}
 
     def extract_footnotes(self, document_id: str, line_items: Optional[List[str]] = None) -> List[Dict[str, Any]]:
         """

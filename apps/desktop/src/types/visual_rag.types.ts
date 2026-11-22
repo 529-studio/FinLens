@@ -26,11 +26,22 @@ export interface QueryRequestDTO {
   inference_mode?: 'auto' | 'local' | 'cloud';
 }
 
+export interface FootnoteReferenceDTO {
+  line_item: string;
+  code?: string;
+  footnote_number: string;
+  footnote_title: string;
+  summary: string;
+  page_number: number;
+  bounding_box: BoundingBoxDTO;
+}
+
 export interface QueryResponseDTO {
   document_id: string;
   query_text: string;
   answer: string;
   evidences: GroundedEvidenceDTO[];
+  footnotes?: FootnoteReferenceDTO[];
   retrieved_page_numbers: number[];
   engine_used: string;
   latency_ms: number;

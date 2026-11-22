@@ -139,12 +139,24 @@ class QueryRequest(BaseModel):
         return cleaned
 
 
+class FootnoteItem(BaseModel):
+    """Structured financial statement footnote (Thuyết minh BCTC) reference."""
+    line_item: str
+    code: Optional[str] = None
+    footnote_number: str
+    footnote_title: str
+    summary: str
+    page_number: int
+    bounding_box: BoundingBox
+
+
 class QueryResponse(BaseModel):
     """Response payload containing financial insight, audit trail, and visual grounding."""
     document_id: str
     query_text: str
     answer: str = Field(..., description="Analyzed answer synthesizing text and chart data")
     evidences: List[GroundedEvidence] = Field(default_factory=list, description="Visual grounding audit trail")
+    footnotes: List[FootnoteItem] = Field(default_factory=list, description="Extracted footnote citations")
     retrieved_page_numbers: List[int]
     engine_used: str = Field(..., description="e.g. 'mlx-qwen2.5-vl-7b-4bit' or 'claude-3-5-sonnet'")
     latency_ms: float
@@ -303,17 +315,6 @@ class StreamingChunk(BaseModel):
     answer: Optional[str] = None
     elapsed_ms: Optional[float] = None
     error: Optional[str] = None
-
-
-class FootnoteItem(BaseModel):
-    """Structured financial statement footnote (Thuyết minh BCTC) reference."""
-    line_item: str
-    code: Optional[str] = None
-    footnote_number: str
-    footnote_title: str
-    summary: str
-    page_number: int
-    bounding_box: BoundingBox
 
 
 class FootnoteQueryRequest(BaseModel):

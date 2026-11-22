@@ -371,7 +371,7 @@ async def websocket_query_stream(websocket: WebSocket):
                 for p in candidate_pages
             ]
 
-            async for chunk in router.stream_analyze_pages(page_tuples, query_text, mode):
+            async for chunk in router.stream_analyze_pages(page_tuples, query_text, mode, document_id=doc_id):
                 await websocket.send_text(json.dumps(chunk))
 
     except WebSocketDisconnect:
@@ -491,11 +491,26 @@ async def query_financial_document(req: QueryRequest):
 
     duration_ms = (time.time() - start_time) * 1000.0
 
+    raw_footnotes = router.extract_footnotes(req.document_id, [req.query_text])
+    extracted_footnotes = [
+        FootnoteItem(
+            line_item=f["line_item"],
+            code=f.get("code"),
+            footnote_number=f["footnote_number"],
+            footnote_title=f["footnote_title"],
+            summary=f["summary"],
+            page_number=f["page_number"],
+            bounding_box=BoundingBox(**f["bounding_box"]),
+        )
+        for f in raw_footnotes
+    ]
+
     return QueryResponse(
         document_id=req.document_id,
         query_text=req.query_text,
         answer=vlm_result.get("answer", "Chưa có câu trả lời."),
         evidences=evidences,
+        footnotes=extracted_footnotes,
         retrieved_page_numbers=candidate_pages,
         engine_used=vlm_result.get("engine", "unknown"),
         latency_ms=round(duration_ms, 2),

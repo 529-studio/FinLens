@@ -10,6 +10,7 @@ import {
   GroundedEvidenceDTO,
   ComparativeQueryRequestDTO,
   ComparativeQueryResponseDTO,
+  FootnoteReferenceDTO,
   UIState,
 } from '../types/visual_rag.types';
 import { fetchQuery, fetchComparativeQuery, ApiError } from '../api/visual_rag.fetch';
@@ -50,6 +51,7 @@ export function useVisualRag(documentId: string) {
             const ws = new WebSocket('ws://127.0.0.1:8765/ws/query/stream');
             let accumulated = '';
             let evidences: GroundedEvidenceDTO[] = [];
+            let footnotes: FootnoteReferenceDTO[] = [];
 
             ws.onopen = () => {
               ws.send(JSON.stringify(payload));
@@ -63,6 +65,8 @@ export function useVisualRag(documentId: string) {
                   setStreamingAnswer(accumulated);
                 } else if (data.event === 'evidence' && Array.isArray(data.evidences)) {
                   evidences = data.evidences;
+                } else if (data.event === 'footnote' && Array.isArray(data.footnotes)) {
+                  footnotes = data.footnotes;
                 } else if (data.event === 'done') {
                   streamedSuccessfully = true;
                   const fullResp: QueryResponseDTO = {
@@ -70,6 +74,7 @@ export function useVisualRag(documentId: string) {
                     query_text: queryText,
                     answer: data.answer || accumulated,
                     evidences: evidences,
+                    footnotes: data.footnotes || footnotes,
                     retrieved_page_numbers: evidences.map((e) => e.page_number),
                     engine_used: 'vlm-stream',
                     latency_ms: data.elapsed_ms || 0,
@@ -163,6 +168,20 @@ export function useVisualRag(documentId: string) {
     setActiveEvidence(evidence);
   }, []);
 
+  const focusFootnote = useCallback(
+    (footnote: FootnoteReferenceDTO) => {
+      setActiveEvidence({
+        page_number: footnote.page_number,
+        bounding_box: footnote.bounding_box,
+        label: `TM ${footnote.footnote_number}: ${footnote.line_item}`,
+        extracted_value: footnote.summary,
+        confidence: 1.0,
+        document_id: documentId,
+      });
+    },
+    [documentId]
+  );
+
   const clearError = useCallback(() => {
     setError(null);
     setState(history.length > 0 ? 'success' : 'idle');
@@ -178,6 +197,7 @@ export function useVisualRag(documentId: string) {
     ask,
     askComparative,
     focusEvidence,
+    focusFootnote,
     clearError,
   };
 }

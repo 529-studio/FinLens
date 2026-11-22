@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128" fill="none">
+  <defs>
+    <linearGradient id="fintrace-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#4F46E5" />
+      <stop offset="100%" stop-color="#06B6D4" />
+    </linearGradient>
+    <linearGradient id="fintrace-accent" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#10B981" />
+      <stop offset="100%" stop-color="#059669" />
+    </linearGradient>
+  </defs>
+  <!-- Background Rounded Shield -->
+  <rect x="8" y="8" width="112" height="112" rx="28" fill="#0F172A" stroke="url(#fintrace-grad)" stroke-width="4" />
+  
+  <!-- Financial Chart Bars -->
+  <rect x="32" y="68" width="14" height="32" rx="4" fill="#6366F1" opacity="0.8" />
+  <rect x="52" y="52" width="14" height="48" rx="4" fill="url(#fintrace-grad)" />
+  <rect x="72" y="38" width="14" height="62" rx="4" fill="url(#fintrace-accent)" />
+  
+  <!-- Visual Trace / Grounding Target Crosshair -->
+  <circle cx="86" cy="40" r="16" stroke="#38BDF8" stroke-width="3" stroke-dasharray="4 2" />
+  <circle cx="86" cy="40" r="5" fill="#38BDF8" />
+  
+  <!-- Upward Trend Line -->
+  <path d="M28 80 L52 56 L72 44 L98 28" stroke="#F8FAFC" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
+  <polygon points="98,22 104,28 94,32" fill="#F8FAFC" />
+</svg>

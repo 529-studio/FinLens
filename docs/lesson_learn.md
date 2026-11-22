@@ -223,6 +223,44 @@
   - *WebSocket Token Streaming:* Triển khai endpoint `/ws/query/stream` trên FastAPI daemon truyền từng chunk token kèm bounding box evidence, kết hợp hook `useStreamingQuery.ts` trên React hiển thị chữ nhảy dần thời gian thực, có cơ chế fallback sang REST `fetchQuery` khi mất kết nối socket.
   - *Bóc tách Thuyết minh BCTC:* Triển khai `/api/v1/query/footnotes` trả về cấu trúc Thuyết minh chuẩn VAS/IFRS kèm tọa độ hộp bao, tự động nhúng trích dẫn giải trình vào comment ô tính trong Excel bằng Office.js (`insertFinancialTableToSheet`).
 
+---
+
+### Bài học 22: Chiến Lược Rà Soát Sở Hữu Trí Tuệ & Đổi Tên An Toàn Sản Phẩm (Rebranding sang FinTrace)
+- **Bối cảnh & Thách thức:** Phát hiện thương hiệu `FinSight` bị trùng lặp nhãn hiệu tài chính đã đăng ký bảo hộ tại Việt Nam. Khi đề xuất tên thay thế `FinLens`, rà soát tiếp tục phát hiện doanh nghiệp "CÔNG TY TNHH DỮ LIỆU FINLENS" (MST 3703442871, ứng dụng "FinLens - Chứng khoán" trên iOS App Store / Google Play, YC S24 Finlens). Nếu phát hành ra thị trường sẽ đối mặt với nguy cơ bị khởi kiện và gỡ app.
+- **Giải pháp chuẩn hóa (Sprint 9 - Brand Clearance):**
+  - Thực hiện tra cứu đa tầng: Cổng dịch vụ công Cục Sở hữu Trí tuệ (WIPO/IP Vietnam), Cổng thông tin quốc gia về đăng ký doanh nghiệp, iOS App Store, Google Play và GitHub.
+  - Lựa chọn tên **FinTrace**: Thể hiện trực tiếp năng lực cốt lõi "Visual Tracing & Evidence Audit Trail", 100% sạch về mặt sở hữu trí tuệ tại Việt Nam và quốc tế.
+  - Chuyển đổi tên kho lưu trữ GitHub sang `529-studio/FinTrace`, cấu hình remote HTTPS để tương thích với GitHub CLI credential helper, và tạo symlink CWD cục bộ để phiên Antigravity IDE không bị đứt đoạn.
+
+---
+
+### Bài học 23: Triển Khai Docker Compose Đa Thuê Bao (Multi-Tenant LAN Box) Cho Ngân Hàng Doanh Nghiệp
+- **Bối cảnh & Thách thức:** Các phòng ban kế toán, thẩm định tín dụng và kiểm toán ngân hàng yêu cầu vận hành mô hình On-Premise / Private Cloud nội bộ (Air-Gapped LAN) hoàn toàn không gửi dữ liệu BCTC ra Internet, đồng thời phải hỗ trợ phân quyền đa thuê bao (multi-tenant) và giới hạn tài nguyên nghiêm ngặt.
+- **Giải pháp chuẩn hóa (Sprint 9 - Task S9-02):**
+  - Xây dựng Dockerfile đa tầng (`deploy/Dockerfile.engine`) chạy user không đặc quyền (`appuser:10001`), cấu hình biến môi trường PEP 508 phân tách các thư viện chỉ dành riêng cho macOS (`mlx ; sys_platform == 'darwin'`) để container Linux Docker build thành công.
+  - Cấu hình Nginx reverse proxy gateway xử lý đồng thời HTTP REST, WebSocket upgrade (`/ws/`), CORS nội bộ và giới hạn kích thước upload 50MB.
+  - Kịch bản thiết lập `deploy/setup-lan.sh` tự động sinh khóa bí mật mã hóa 32-byte bằng `openssl rand -hex 32` với quyền truy cập nghiêm ngặt `chmod 600`, đảm bảo tuân thủ chính sách Zero-Leak.
+
+---
+
+### Bài học 24: Deep-Linking Tương Tác Thuyết Minh BCTC & Điều Hướng Trực Quan Hai Chiều Trên PDF
+- **Bối cảnh & Thách thức:** Khi nhận được câu trả lời từ AI kèm trích dẫn Thuyết minh BCTC (ví dụ: "TM 4: Tiền và các khoản tương đương tiền - Trang 2"), chuyên viên tài chính cần một cơ chế tương tác trực tiếp: bấm vào chip thuyết minh thì trình xem PDF phải tự động chuyển ngay đến trang Thuyết minh và vẽ bounding box nổi bật đoạn văn bản giải trình.
+- **Giải pháp chuẩn hóa (Sprint 9 - Task S9-03):**
+  - Thiết kế component `FootnoteChip.tsx` tuân thủ tiêu chuẩn Kiosk Ergonomics (chiều cao tối thiểu 48px), 100% SVG vector Lucide React (`BookOpen`), cấm tuyệt đối Unicode emoji thô (Rule 15).
+  - Triển khai hàm điều hướng `focusFootnote` trong custom hook `useVisualRag.hook.ts`, ánh xạ trực tiếp số trang và bounding box của thuyết minh vào state `activeEvidence`.
+  - Đồng bộ hợp đồng dữ liệu giữa FastAPI backend (`QueryResponse.footnotes`) và TypeScript frontend (`QueryResponseDTO.footnotes`) hỗ trợ cả WebSocket stream và REST fallback.
+
+---
+
+### Bài học 25: Đóng Gói AppSource Microsoft 365 Manifest & Ký Số Windows Authenticode
+- **Bối cảnh & Thách thức:** Để phân phối tiện ích bổ sung Excel cho toàn bộ nhân viên kế toán thông qua Microsoft 365 Admin Center, tệp manifest phải tuân thủ nghiêm ngặt lược đồ Office Add-in XML Schema 1.1 và các tiêu chuẩn kiểm định của Microsoft. Đồng thời, bộ cài đặt Windows desktop cần được đóng gói NSIS và ký số Authenticode với nhãn thời gian RFC 3161 để không bị Windows Defender SmartScreen chặn.
+- **Giải pháp chuẩn hóa (Sprint 9 - Tasks S9-04, S9-05):**
+  - Thiết kế `manifest.appsource.xml` với đầy đủ định danh UUID, thông tin nhà phát hành `529 Studio`, danh mục AppDomains và liên kết bảo mật HTTPS 100%. Tạo bộ icon đa kích thước (16, 32, 64, 80, 128px) và logo vector SVG.
+  - Viết kịch bản kiểm định tự động `apps/excel/scripts/validate-manifest.js` tích hợp công cụ chính thức `office-addin-manifest validate`.
+  - Cấu hình Tauri v2 NSIS với chế độ cài đặt `currentUser` (không đòi quyền Admin), biểu tượng `icon.ico` và ảnh tiêu đề installer.
+  - Xây dựng kịch bản ký số kép `scripts/sign-windows.sh` và `scripts/sign-windows.ps1` hỗ trợ Azure Trusted Signing và `signtool.exe` với cờ `--dry-run` an toàn cho môi trường kiểm thử CI.
+
+
 
 
 

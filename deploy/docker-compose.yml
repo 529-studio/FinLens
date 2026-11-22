@@ -1,0 +1,78 @@
+# ==============================================================================
+# FinTrace Multi-Tenant Docker Compose LAN Deployment for Enterprise Banking
+# Governed by 529 Engineering Standards:
+# - docker-runtime-patching-and-secrets
+# - Resource limits (OOM prevention)
+# - Persistent volumes for LanceDB and Document Uploads
+# ==============================================================================
+
+services:
+  engine:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.engine
+    image: fintrace/engine:1.0.0
+    container_name: fintrace-engine
+    restart: unless-stopped
+    user: "10001:10001"
+    environment:
+      - FINTRACE_DAEMON_HOST=0.0.0.0
+      - FINTRACE_DAEMON_PORT=8765
+      - FINTRACE_STORAGE_DIR=/home/appuser/.fintrace/data
+      - FINTRACE_LANCEDB_PATH=/home/appuser/.fintrace/lancedb
+      - FINTRACE_INFERENCE_MODE=${FINTRACE_INFERENCE_MODE:-cloud}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - AZURE_OPENAI_API_KEY=${AZURE_OPENAI_API_KEY:-}
+      - AZURE_OPENAI_ENDPOINT=${AZURE_OPENAI_ENDPOINT:-}
+    volumes:
+      - fintrace_lancedb:/home/appuser/.fintrace/lancedb
+      - fintrace_uploads:/home/appuser/.fintrace/uploads
+      - fintrace_cache:/home/appuser/.fintrace/cache
+    deploy:
+      resources:
+        limits:
+          memory: 4096M
+        reservations:
+          memory: 1024M
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8765/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - fintrace-internal
+
+  gateway:
+    image: nginx:1.27-alpine
+    container_name: fintrace-gateway
+    restart: unless-stopped
+    ports:
+      - "${LAN_PORT:-8080}:80"
+    volumes:
+      - ./nginx/fintrace-lan.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      engine:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 128M
+    networks:
+      - fintrace-internal
+
+volumes:
+  fintrace_lancedb:
+    name: fintrace_lan_lancedb
+  fintrace_uploads:
+    name: fintrace_lan_uploads
+  fintrace_cache:
+    name: fintrace_lan_cache
+
+networks:
+  fintrace-internal:
+    name: fintrace_lan_net
+    driver: bridge

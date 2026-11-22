@@ -43,3 +43,38 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
           bash scripts/notarize-macos.sh --dry-run
+
+  build-and-sign-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install Monorepo Dependencies
+        run: |
+          npm install
+          npm install --prefix apps/desktop
+
+      - name: Run Desktop Test Suites
+        run: npm --prefix apps/desktop test
+
+      - name: Build Windows NSIS Bundle
+        run: |
+          npm --prefix apps/desktop run tauri:build
+
+      - name: Sign Windows NSIS Installer (Authenticode)
+        env:
+          WINDOWS_SIGNING_CERT: ${{ secrets.WINDOWS_SIGNING_CERT }}
+          WINDOWS_SIGNING_CERT_PASSWORD: ${{ secrets.WINDOWS_SIGNING_CERT_PASSWORD }}
+          AZURE_KEY_VAULT_URI: ${{ secrets.AZURE_KEY_VAULT_URI }}
+        shell: pwsh
+        run: |
+          ./scripts/sign-windows.ps1 -DryRun

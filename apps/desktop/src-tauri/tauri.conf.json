@@ -1,8 +1,8 @@
 {
   "$schema": "../../../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "FinSight",
+  "productName": "FinTrace",
   "version": "0.1.0",
-  "identifier": "com.finsight.desktop",
+  "identifier": "com.529studio.fintrace",
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:5173",
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "FinSight — Trợ lý Phân Tích BCTC bằng Visual RAG",
+        "title": "FinTrace — Trợ lý Phân Tích BCTC bằng Visual RAG",
         "width": 1280,
         "height": 800,
         "minWidth": 960,

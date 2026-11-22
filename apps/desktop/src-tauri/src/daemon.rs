@@ -105,6 +105,8 @@ impl DaemonManager {
         cmd.arg(&script_path)
             .current_dir(repo_root)
             .env("PYTHONPATH", repo_root.join("packages/core-engine/src"))
+            .env("FINTRACE_DAEMON_PORT", self.port.to_string())
+            .env("FINTRACE_DAEMON_HOST", "127.0.0.1")
             .env("FINSIGHT_DAEMON_PORT", self.port.to_string())
             .env("FINSIGHT_DAEMON_HOST", "127.0.0.1")
             .stdout(Stdio::null())

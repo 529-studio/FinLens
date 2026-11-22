@@ -73,7 +73,7 @@ export const SettingsDialog: FC<SettingsDialogProps> = ({ isOpen, onClose }) => 
     <div
       role="dialog"
       aria-modal="true"
-      aria-label="FinSight Settings"
+      aria-label="FinTrace Settings"
       className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4 animate-in fade-in duration-200"
     >
       <div className="w-full max-w-2xl bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
@@ -84,7 +84,7 @@ export const SettingsDialog: FC<SettingsDialogProps> = ({ isOpen, onClose }) => 
               <Settings className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-sm font-semibold text-slate-100">Cài đặt & Cấu hình FinSight</h2>
+              <h2 className="text-sm font-semibold text-slate-100">Cài đặt & Cấu hình FinTrace</h2>
               <p className="text-[11px] text-slate-400">Quản lý Dual-Engine, Cloud BYOK và Lưu trữ Vector</p>
             </div>
           </div>
@@ -191,7 +191,7 @@ export const SettingsDialog: FC<SettingsDialogProps> = ({ isOpen, onClose }) => 
                   Chọn chiến lược suy luận VLM
                 </h3>
                 <p className="text-xs text-slate-400">
-                  FinSight hỗ trợ kiến trúc Dual-Engine linh hoạt giữa xử lý cục bộ và đám mây.
+                  FinTrace hỗ trợ kiến trúc Dual-Engine linh hoạt giữa xử lý cục bộ và đám mây.
                 </p>
               </div>
 
@@ -501,7 +501,7 @@ export const SettingsDialog: FC<SettingsDialogProps> = ({ isOpen, onClose }) => 
 
         {/* Footer */}
         <footer className="h-16 px-6 border-t border-slate-800 flex items-center justify-between flex-shrink-0 bg-slate-900/90">
-          <span className="text-[11px] text-slate-400">FinSight Visual Financial Intelligence v0.1.0</span>
+          <span className="text-[11px] text-slate-400">FinTrace Visual Financial Intelligence v0.1.0</span>
           <button
             type="button"
             onClick={onClose}

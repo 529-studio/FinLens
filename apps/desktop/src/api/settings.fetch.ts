@@ -28,7 +28,7 @@ async function requestWithTimeout<T>(
       ...options,
       headers: {
         'Content-Type': 'application/json',
-        'User-Agent': 'FinSight-Desktop-Client/1.0',
+        'User-Agent': 'FinTrace-Desktop-Client/1.0',
         ...(options.headers || {}),
       },
       signal: controller.signal,

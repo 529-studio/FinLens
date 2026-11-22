@@ -62,7 +62,7 @@ from model_manager import (
 from mlx_engine import MLXEngine
 
 app = FastAPI(
-    title="FinSight Visual Financial RAG Daemon",
+    title="FinTrace Visual Financial RAG Daemon",
     version="0.1.0",
     description="Local daemon serving visual search, VLM grounding, and financial analytics.",
 )
@@ -88,7 +88,7 @@ router = VlmRouter(mlx_engine=mlx_engine, cloud_router=cloud_router)
 def health_check():
     return {
         "status": "healthy",
-        "service": "FinSight Core Daemon",
+        "service": "FinTrace Core Daemon",
         "hardware_detected": router.detect_hardware_capability(),
         "timestamp": time.time(),
     }
@@ -642,6 +642,6 @@ def clear_application_cache(req: Optional[CacheClearRequest] = None):
 
 if __name__ == "__main__":
     import uvicorn
-    host = os.getenv("FINSIGHT_DAEMON_HOST", "127.0.0.1")
-    port = int(os.getenv("FINSIGHT_DAEMON_PORT", 8765))
+    host = os.getenv("FINTRACE_DAEMON_HOST", os.getenv("FINSIGHT_DAEMON_HOST", "127.0.0.1"))
+    port = int(os.getenv("FINTRACE_DAEMON_PORT", os.getenv("FINSIGHT_DAEMON_PORT", 8765)))
     uvicorn.run("main:app", host=host, port=port, reload=True)

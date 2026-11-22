@@ -1,4 +1,4 @@
-name: FinSight CI
+name: FinTrace CI
 on:
   push:
     branches: [dev, main]

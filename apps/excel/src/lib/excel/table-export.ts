@@ -74,7 +74,7 @@ export async function insertFinancialTableToSheet(
   data: FinancialTableData
 ): Promise<TableExportResult> {
   const { valuesMatrix, totalRowIndex } = prepareExportMatrix(data);
-  let auditComment = `[FinSight Audit Trail] Trích xuất từ tài liệu ${data.sourceDocId}, trang ${data.sourcePage}. Nhấp vào sidebar để xem ảnh gốc.`;
+  let auditComment = `[FinTrace Audit Trail] Trích xuất từ tài liệu ${data.sourceDocId}, trang ${data.sourcePage}. Nhấp vào sidebar để xem ảnh gốc.`;
   if (data.footnotes && data.footnotes.length > 0) {
     const fnSummary = data.footnotes
       .map((f) => `TM ${f.footnoteNumber} (${f.lineItem}): ${f.summary}`)

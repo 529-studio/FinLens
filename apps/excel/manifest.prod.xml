@@ -4,19 +4,19 @@
   <Version>1.0.0.0</Version>
   <ProviderName>529 Studio</ProviderName>
   <DefaultLocale>en-US</DefaultLocale>
-  <DisplayName DefaultValue="FinSight Add-in (Production)" />
-  <Description DefaultValue="FinSight Financial Analyst Add-in" />
-  <IconUrl DefaultValue="https://finsight.529studio.site/assets/icon-32.png" />
-  <HighResolutionIconUrl DefaultValue="https://finsight.529studio.site/assets/icon-64.png" />
-  <SupportUrl DefaultValue="https://finsight.529studio.site/support" />
+  <DisplayName DefaultValue="FinTrace Add-in (Production)" />
+  <Description DefaultValue="FinTrace Financial Analyst Add-in" />
+  <IconUrl DefaultValue="https://fintrace.529studio.site/assets/icon-32.png" />
+  <HighResolutionIconUrl DefaultValue="https://fintrace.529studio.site/assets/icon-64.png" />
+  <SupportUrl DefaultValue="https://fintrace.529studio.site/support" />
   <AppDomains>
-    <AppDomain>https://finsight.529studio.site</AppDomain>
+    <AppDomain>https://fintrace.529studio.site</AppDomain>
   </AppDomains>
   <Hosts>
     <Host Name="Workbook" />
   </Hosts>
   <DefaultSettings>
-    <SourceLocation DefaultValue="https://finsight.529studio.site/taskpane.html" />
+    <SourceLocation DefaultValue="https://fintrace.529studio.site/taskpane.html" />
   </DefaultSettings>
   <Permissions>ReadWriteDocument</Permissions>
 </OfficeApp>

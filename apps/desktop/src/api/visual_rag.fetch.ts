@@ -41,7 +41,7 @@ export async function fetchQuery(
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'User-Agent': 'FinSight-Desktop-Client/1.0',
+        'User-Agent': 'FinTrace-Desktop-Client/1.0',
       },
       body: JSON.stringify(payload),
       signal: controller.signal,
@@ -71,7 +71,7 @@ export async function ingestDocument(
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'User-Agent': 'FinSight-Desktop-Client/1.0',
+      'User-Agent': 'FinTrace-Desktop-Client/1.0',
     },
     body: JSON.stringify({ file_path: filePath, render_dpi: dpi }),
   });
@@ -99,7 +99,7 @@ export async function fetchComparativeQuery(
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'User-Agent': 'FinSight-Desktop-Client/1.0',
+        'User-Agent': 'FinTrace-Desktop-Client/1.0',
       },
       body: JSON.stringify(payload),
       signal: controller.signal,

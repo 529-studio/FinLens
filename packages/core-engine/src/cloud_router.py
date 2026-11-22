@@ -227,7 +227,7 @@ class CloudRouter:
                 {
                     "role": "system",
                     "content": (
-                        "You are FinSight AI, a premier financial analyst. Examine the provided "
+                        "You are FinTrace AI, a premier financial analyst. Examine the provided "
                         "financial report page images and answer the question accurately in Vietnamese "
                         "or English with cross-page evidence linkage. Always provide exact visual grounding bounding boxes "
                         "formatted strictly as a JSON array of objects with keys: "

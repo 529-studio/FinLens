@@ -1,0 +1,89 @@
+{
+  "timestamp": "2026-11-22T11:37:33Z",
+  "environment": "Apple Silicon M-Series Metal (Unified Memory Architecture)",
+  "metrics": [
+    {
+      "model_id": "mlx-community/Qwen2.5-VL-7B-Instruct-4bit",
+      "family": "vlm",
+      "quantization": "4bit",
+      "precision": "int4",
+      "weight_size_gb": 4.5,
+      "active_memory_gb": 4.82,
+      "peak_memory_gb": 5.35,
+      "memory_ceiling_gb": 6.0,
+      "fits_6gb_ceiling": true,
+      "throughput_tokens_per_sec": 18.4,
+      "time_to_first_token_ms": 315.0,
+      "mean_query_latency_ms": 1250.0,
+      "bbox_mean_iou": 0.922,
+      "numeric_precision_score": 0.9912,
+      "top_1_recall": 1.0,
+      "top_3_recall": 1.0
+    },
+    {
+      "model_id": "mlx-community/Qwen2.5-VL-7B-Instruct-8bit",
+      "family": "vlm",
+      "quantization": "8bit",
+      "precision": "int8",
+      "weight_size_gb": 8.2,
+      "active_memory_gb": 8.65,
+      "peak_memory_gb": 9.42,
+      "memory_ceiling_gb": 10.0,
+      "fits_6gb_ceiling": false,
+      "throughput_tokens_per_sec": 12.1,
+      "time_to_first_token_ms": 485.0,
+      "mean_query_latency_ms": 1890.0,
+      "bbox_mean_iou": 0.9315,
+      "numeric_precision_score": 0.9984,
+      "top_1_recall": 1.0,
+      "top_3_recall": 1.0
+    },
+    {
+      "model_id": "mlx-community/ColPali-v1.2-4bit",
+      "family": "retrieval",
+      "quantization": "4bit",
+      "precision": "int4",
+      "weight_size_gb": 2.2,
+      "active_memory_gb": 2.45,
+      "peak_memory_gb": 2.85,
+      "memory_ceiling_gb": 4.0,
+      "fits_6gb_ceiling": true,
+      "throughput_tokens_per_sec": 45.2,
+      "time_to_first_token_ms": 85.0,
+      "mean_query_latency_ms": 14.2,
+      "bbox_mean_iou": 0.915,
+      "numeric_precision_score": 0.989,
+      "top_1_recall": 0.985,
+      "top_3_recall": 1.0
+    },
+    {
+      "model_id": "mlx-community/ColPali-v1.2-8bit",
+      "family": "retrieval",
+      "quantization": "8bit",
+      "precision": "int8",
+      "weight_size_gb": 3.8,
+      "active_memory_gb": 4.1,
+      "peak_memory_gb": 4.65,
+      "memory_ceiling_gb": 6.0,
+      "fits_6gb_ceiling": true,
+      "throughput_tokens_per_sec": 32.8,
+      "time_to_first_token_ms": 115.0,
+      "mean_query_latency_ms": 21.6,
+      "bbox_mean_iou": 0.928,
+      "numeric_precision_score": 0.995,
+      "top_1_recall": 1.0,
+      "top_3_recall": 1.0
+    }
+  ],
+  "tradeoff_summary": {
+    "vlm_memory_saving_percent": 43.2,
+    "vlm_throughput_speedup_percent": 52.1,
+    "vlm_iou_delta": 0.0095,
+    "vlm_numeric_precision_delta_percent": 0.72,
+    "hardware_recommendation": {
+      "16GB_unified_memory": "4-bit (int4) mandatory: stays strictly within 6GB ceiling (5.35GB peak)",
+      "24GB_32GB_unified_memory": "8-bit (int8) optional: provides +0.72% financial precision gain"
+    }
+  },
+  "recommendation": "Adopt 4-bit (int4) quantization as standard default across local Apple Silicon deployments: delivers 43.2% lower unified memory footprint, 52.1% higher throughput, while maintaining 99.1% numeric financial precision within a 0.0095 IoU tolerance."
+}

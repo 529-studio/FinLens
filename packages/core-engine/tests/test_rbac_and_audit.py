@@ -9,9 +9,13 @@ Governed by Sprint 10 Task S10-03, AGENTS.md Rule 1, Rule 2, Rule 3, Rule 13, an
 import os
 import json
 import time
+import sys
 from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
+
 from auth import (
     Role,
     Permission,
@@ -78,8 +82,10 @@ def test_jwt_tampered_signature_rejected():
         user_id="attacker",
         role=Role.ADMIN,
     )
-    # Alter the last character of signature
-    tampered_token = token[:-1] + ("A" if token[-1] != "A" else "B")
+    # Alter the first character of signature to guarantee cryptographic mismatch
+    parts = token.split(".")
+    tampered_sig = ("A" if parts[2][0] != "A" else "B") + parts[2][1:]
+    tampered_token = f"{parts[0]}.{parts[1]}.{tampered_sig}"
 
     with pytest.raises(Exception) as exc_info:
         decode_access_token(tampered_token)

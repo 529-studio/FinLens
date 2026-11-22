@@ -62,11 +62,14 @@ class MLXEngine:
         self,
         model_manager: Optional[ModelManager] = None,
         model_id: str = DEFAULT_MODEL_ID,
-        memory_ceiling_gb: float = MEMORY_CEILING_GB,
+        memory_ceiling_gb: Optional[float] = None,
     ):
         self.model_manager = model_manager or ModelManager()
         self.model_id = model_id
-        self.memory_ceiling_gb = memory_ceiling_gb
+        info = self.model_manager.get_model_info(model_id)
+        self.quantization = info.get("quantization", "4bit")
+        self.precision = info.get("precision", "int4")
+        self.memory_ceiling_gb = memory_ceiling_gb if memory_ceiling_gb is not None else info.get("memory_ceiling_gb", MEMORY_CEILING_GB)
         self._model = None
         self._processor = None
         self._is_loaded = False
@@ -130,26 +133,39 @@ class MLXEngine:
             logger.error(msg)
             raise MemoryCeilingExceededError(msg)
 
-    def load_model(self, model_id: Optional[str] = None) -> bool:
+    def load_model(self, model_id: Optional[str] = None, quantization: Optional[str] = None) -> bool:
         """
-        Loads 4-bit quantized Qwen2.5-VL weights into Apple Silicon unified memory.
+        Loads quantized Qwen2.5-VL weights (4-bit or 8-bit) into Apple Silicon unified memory.
+        Adjusts memory ceiling dynamically based on quantization precision.
         """
-        mid = model_id or self.model_id
-        if not self.model_manager.is_cached(mid):
-            logger.warning("Model '%s' is not cached locally. Call download_model first.", mid)
+        target_mid = model_id or self.model_id
+        if quantization:
+            if quantization == "8bit" and "4bit" in target_mid:
+                target_mid = target_mid.replace("4bit", "8bit")
+            elif quantization == "4bit" and "8bit" in target_mid:
+                target_mid = target_mid.replace("8bit", "4bit")
+
+        self.model_id = target_mid
+        info = self.model_manager.get_model_info(target_mid)
+        self.quantization = info.get("quantization", "4bit")
+        self.precision = info.get("precision", "int4")
+        self.memory_ceiling_gb = info.get("memory_ceiling_gb", 6.0)
+
+        if not self.model_manager.is_cached(target_mid):
+            logger.warning("Model '%s' is not cached locally. Call download_model first.", target_mid)
             return False
 
         if mlx_vlm is None:
             logger.warning("mlx_vlm is not available in the current environment.")
             return False
 
-        model_dir = self.model_manager.get_model_dir(mid)
-        logger.info("Loading MLX model from %s...", model_dir)
+        model_dir = self.model_manager.get_model_dir(target_mid)
+        logger.info("Loading MLX %s model from %s...", self.quantization, model_dir)
 
         self._model, self._processor = mlx_vlm.load(str(model_dir))
         self._is_loaded = True
         self.check_memory_ceiling()
-        logger.info("MLX model '%s' loaded successfully. Memory usage: %s", mid, self.get_memory_usage())
+        logger.info("MLX model '%s' loaded successfully. Memory usage: %s", target_mid, self.get_memory_usage())
         return True
 
     def parse_vlm_output(self, raw_output: str, page_number: int) -> Tuple[str, List[Dict[str, Any]]]:

@@ -234,7 +234,7 @@ class MLXEngine:
             image_tags = "\n".join(["<image>" for _ in pages])
             prompt = (
                 f"<|im_start|>system\n"
-                f"You are FinSight AI, a financial document specialist. "
+                f"You are FinTrace AI, a financial document specialist. "
                 f"Examine the document page images carefully and answer the user question with cross-page evidence linkage. "
                 f"Output your answer in Vietnamese or English as requested. "
                 f"Identify the visual evidence supporting your answer and output bounding boxes "

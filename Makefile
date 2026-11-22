@@ -1,5 +1,5 @@
 # ==============================================================================
-# FinSight — Visual Financial RAG Monorepo Makefile
+# FinTrace — Visual Financial RAG Monorepo Makefile
 # Governed by 529 Studio Engineering Standards & AGENTS.md
 # ==============================================================================
 
@@ -23,7 +23,7 @@ BOLD   := \033[1m
 .PHONY: help
 help: ## Show this help menu with descriptions
 	@echo ""
-	@echo -e "$(BOLD)$(CYAN)FinSight — Visual Financial RAG Developer CLI$(RESET)"
+	@echo -e "$(BOLD)$(CYAN)FinTrace — Visual Financial RAG Developer CLI$(RESET)"
 	@echo -e "Usage: $(GREEN)make [target]$(RESET)"
 	@echo ""
 	@awk 'BEGIN {FS = ":.*##"; printf ""} \
@@ -35,7 +35,7 @@ help: ## Show this help menu with descriptions
 
 .PHONY: dev
 dev: kill ## Run both backend Core Engine and Desktop Frontend concurrently
-	@echo -e "$(GREEN)Starting FinSight Full-Stack Environment...$(RESET)"
+	@echo -e "$(GREEN)Starting FinTrace Full-Stack Environment...$(RESET)"
 	@echo -e "$(YELLOW)Engine: http://127.0.0.1:8765$(RESET) | $(YELLOW)Desktop UI: http://localhost:5173$(RESET)"
 	@trap 'kill 0' SIGINT SIGTERM EXIT; \
 		PYTHONPATH=packages/core-engine/src $(VENV_PYTHON) packages/core-engine/src/main.py & \

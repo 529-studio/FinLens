@@ -60,7 +60,7 @@ export function useDaemonLifecycle(autoPoll = true): DaemonState {
       const res = await fetch(HEALTH_URL, {
         method: 'GET',
         headers: {
-          'User-Agent': 'FinSight-Desktop-Client/1.0',
+          'User-Agent': 'FinTrace-Desktop-Client/1.0',
         },
         signal: controller.signal,
       });

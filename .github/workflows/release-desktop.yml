@@ -1,4 +1,4 @@
-name: FinSight Desktop Release & Notarization
+name: FinTrace Desktop Release & Notarization
 on:
   push:
     tags:

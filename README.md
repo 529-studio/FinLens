@@ -1,4 +1,4 @@
-# FinSight — Visual Financial RAG & Hybrid Desktop Platform
+# FinTrace — Visual Financial RAG & Hybrid Desktop Platform
 
 > **Nền tảng Trợ Lý Phân Tích Báo Cáo Tài Chính bằng Visual RAG (Hybrid Desktop & Excel Add-in)**  
 > *Sản phẩm của 529 Studio Architecture Team*
@@ -7,12 +7,12 @@
 
 ## 1. Giới Thiệu & Bài Toán Giải Quyết
 
-FinSight giải quyết triệt để 3 **"tử huyệt"** của RAG truyền thống khi phân tích Báo cáo tài chính (BCTC) và Báo cáo thường niên:
+FinTrace giải quyết triệt để 3 **"tử huyệt"** của RAG truyền thống khi phân tích Báo cáo tài chính (BCTC) và Báo cáo thường niên:
 1. **Mù biểu đồ (Charts Blindness):** Biểu đồ cơ cấu doanh thu, biên lợi nhuận, biểu đồ thác nước (waterfall) bị OCR và text parser bỏ qua 100%.
 2. **Vỡ cấu trúc bảng (Complex Tables Fragmentation):** Cắt đôi bảng biểu nhiều tầng làm mất ngữ cảnh dòng - cột.
 3. **Mất liên kết chú thích (Footnotes Severance):** Các thuyết minh chân trang về nợ tiềm tàng và rủi ro bị tách rời khỏi số liệu chính.
 
-**Giải pháp của FinSight:**
+**Giải pháp của FinTrace:**
 - **Visual RAG Native:** Mỗi trang PDF được render thành ảnh độ phân giải cao (150-200 DPI PNG).
 - **ColPali Visual Retrieval:** Tìm kiếm trực tiếp trên các mảnh ảnh (visual patches) qua cơ chế Late Interaction (MaxSim), không cần qua OCR.
 - **Visual Grounding:** Mô hình VLM (`Qwen2.5-VL` / `Claude 3.5 Sonnet`) suy luận trực tiếp trên ảnh và trả về tọa độ Bounding Box `[ymin, xmin, ymax, xmax]` (thang đo 0-1000).
@@ -36,7 +36,7 @@ FinSight giải quyết triệt để 3 **"tử huyệt"** của RAG truyền th
 ## 3. Cấu Trúc Monorepo
 
 ```
-Finsight/
+FinTrace/
 ├── apps/
 │   └── desktop/                  # Tauri v2 Desktop App (React 19 + Tailwind CSS)
 ├── packages/

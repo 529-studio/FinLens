@@ -12,9 +12,11 @@ from pydantic import BaseModel, Field, field_validator
 
 
 ALLOWED_ROOTS = [
+    Path("~/.fintrace").expanduser().resolve(),
     Path("~/.finsight").expanduser().resolve(),
     Path(__file__).resolve().parents[3] / "benchmarks",
     Path(__file__).resolve().parents[3] / "data",
+    Path("/tmp/fintrace_test").resolve(),
     Path("/tmp/finsight_test").resolve(),
     Path(tempfile.gettempdir()).resolve(),
 ]

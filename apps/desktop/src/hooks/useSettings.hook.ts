@@ -67,7 +67,7 @@ export function useSettings() {
       mlxRes.status === 'rejected' &&
       storeRes.status === 'rejected'
     ) {
-      setError('Không thể kết nối đến FinSight Core Daemon. Hãy chắc chắn daemon đang chạy.');
+      setError('Không thể kết nối đến FinTrace Core Daemon. Hãy chắc chắn daemon đang chạy.');
     }
 
     setIsLoading(false);

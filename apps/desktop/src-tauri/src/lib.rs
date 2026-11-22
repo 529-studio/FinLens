@@ -53,7 +53,7 @@ pub fn run() {
         })
         .on_window_event(|window, event| {
             if let WindowEvent::Destroyed = event {
-                eprintln!("[FinSight] Main window destroyed. Cleaning up child processes...");
+                eprintln!("[FinTrace] Main window destroyed. Cleaning up child processes...");
                 let manager = window.state::<DaemonManager>();
                 manager.terminate();
             }
@@ -63,7 +63,7 @@ pub fn run() {
 
     app.run(|app_handle, event| match event {
         RunEvent::ExitRequested { .. } | RunEvent::Exit => {
-            eprintln!("[FinSight] Application exit event received. Ensuring 0 zombie processes...");
+            eprintln!("[FinTrace] Application exit event received. Ensuring 0 zombie processes...");
             let manager = app_handle.state::<DaemonManager>();
             manager.terminate();
         }

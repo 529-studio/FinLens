@@ -15,7 +15,7 @@ describe('useDaemonLifecycle', () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
       ok: true,
       status: 200,
-      json: async () => ({ status: 'healthy', service: 'FinSight Core Daemon' }),
+      json: async () => ({ status: 'healthy', service: 'FinTrace Core Daemon' }),
     }));
 
     const { result } = renderHook(() => useDaemonLifecycle(false));

@@ -42,7 +42,7 @@ export async function uploadFinancialDocument(
     const res = await fetch(`${BASE_URL}/api/v1/documents/upload`, {
       method: 'POST',
       headers: {
-        'User-Agent': 'FinSight-Excel-Addin/1.0 (+https://529studio.site)',
+        'User-Agent': 'FinTrace-Excel-Addin/1.0 (+https://529studio.site)',
       },
       body: formData,
       signal: controller.signal,
@@ -70,7 +70,7 @@ export async function uploadFinancialDocument(
     if (err instanceof ApiError) {
       throw err;
     }
-    throw new ApiError(0, err.message || 'Không thể kết nối đến FinSight Core Daemon (127.0.0.1:8765)');
+    throw new ApiError(0, err.message || 'Không thể kết nối đến FinTrace Core Daemon (127.0.0.1:8765)');
   } finally {
     clearTimeout(timeoutId);
   }
@@ -80,7 +80,7 @@ export async function fetchDocumentList(): Promise<{ documents: DocumentSummaryD
   try {
     const res = await fetch(`${BASE_URL}/api/v1/documents`, {
       headers: {
-        'User-Agent': 'FinSight-Excel-Addin/1.0',
+        'User-Agent': 'FinTrace-Excel-Addin/1.0',
       },
     });
     if (!res.ok) {
@@ -117,7 +117,7 @@ export const fetchQueryResult = async (query: string, documentId?: string): Prom
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'User-Agent': 'FinSight-Excel-Addin/1.0',
+        'User-Agent': 'FinTrace-Excel-Addin/1.0',
       },
       body: JSON.stringify({
         document_id: documentId,

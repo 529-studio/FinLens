@@ -106,7 +106,7 @@ export const Sidebar: React.FC = () => {
             <FileSpreadsheet className="w-5 h-5" />
           </div>
           <div>
-            <h1 className="font-bold text-base text-slate-900 leading-tight">FinSight Visual RAG</h1>
+            <h1 className="font-bold text-base text-slate-900 leading-tight">FinTrace Visual RAG</h1>
             <p className="text-xs text-slate-500">Trợ lý phân tích BCTC trên Excel</p>
           </div>
         </div>

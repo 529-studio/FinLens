@@ -69,8 +69,8 @@ describe('SettingsDialog Component', () => {
 
   it('renders modal dialog with tabs when isOpen is true', () => {
     render(<SettingsDialog isOpen={true} onClose={() => {}} />);
-    expect(screen.getByRole('dialog', { name: /FinSight Settings/i })).toBeDefined();
-    expect(screen.getByText('Cài đặt & Cấu hình FinSight')).toBeDefined();
+    expect(screen.getByRole('dialog', { name: /FinTrace Settings/i })).toBeDefined();
+    expect(screen.getByText('Cài đặt & Cấu hình FinTrace')).toBeDefined();
     expect(screen.getByText('Chế độ suy luận')).toBeDefined();
     expect(screen.getByText('Cloud BYOK')).toBeDefined();
     expect(screen.getByText('Local Apple Silicon')).toBeDefined();

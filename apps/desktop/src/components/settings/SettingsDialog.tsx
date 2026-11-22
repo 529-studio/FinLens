@@ -501,7 +501,7 @@ export const SettingsDialog: FC<SettingsDialogProps> = ({ isOpen, onClose }) => 
 
         {/* Footer */}
         <footer className="h-16 px-6 border-t border-slate-800 flex items-center justify-between flex-shrink-0 bg-slate-900/90">
-          <span className="text-[11px] text-slate-400">FinTrace Visual Financial Intelligence v0.1.0</span>
+          <span className="text-[11px] text-slate-400">FinTrace Visual Financial Intelligence v1.0.0</span>
           <button
             type="button"
             onClick={onClose}

@@ -5,6 +5,7 @@ import { DocumentUploader } from './DocumentUploader';
 import { bridge } from '../lib/bridge/client';
 import { DocumentIngestResponseDTO, ActiveDocumentState, FinancialTableData } from '../types/api';
 import { insertFinancialTableToSheet } from '../lib/excel/table-export';
+import { SensitivitySlider } from './SensitivitySlider';
 import {
   RefreshCw,
   Search,
@@ -327,6 +328,14 @@ export const Sidebar: React.FC = () => {
             </button>
           </div>
         )}
+      </div>
+
+      {/* Sensitivity Analysis & Formula Auditor Section */}
+      <div className="space-y-3 pt-3 border-t border-slate-200">
+        <label className="text-xs font-semibold uppercase tracking-wider text-slate-500 block">
+          3. Phân Tích Độ Nhạy & Kiểm Toán Công Thức
+        </label>
+        <SensitivitySlider />
       </div>
     </div>
   );

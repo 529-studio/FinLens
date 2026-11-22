@@ -45,7 +45,10 @@ from contracts import (
     FootnoteQueryRequest,
     FootnoteQueryResponse,
     FootnoteItem,
+    TableStitchRequest,
+    TableStitchResponse,
 )
+from table_stitcher import TableStitcher
 from renderer import PdfRenderer
 from retriever import VisualRetriever
 from vlm_router import VlmRouter
@@ -633,6 +636,27 @@ async def query_footnotes(req: FootnoteQueryRequest):
 
 
 
+
+
+@app.post("/api/v1/table/stitch", response_model=TableStitchResponse)
+async def stitch_table(request: TableStitchRequest):
+    """
+    Stitches multi-page table fragments into a unified MultiPageTableDTO.
+    Maintains cross-page coordinate grounding and aligns shifted columns.
+    """
+    t0 = time.perf_counter()
+    stitcher = TableStitcher()
+    try:
+        stitched = stitcher.stitch(request)
+        elapsed_ms = (time.perf_counter() - t0) * 1000
+        return TableStitchResponse(
+            document_id=request.document_id,
+            table=stitched,
+            elapsed_ms=round(elapsed_ms, 2),
+        )
+    except Exception as e:
+        logger.error(f"Table stitching failed: {str(e)}")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Table stitching failed: {str(e)}")
 
 
 @app.get("/api/v1/cache/stats", response_model=CacheStatsResponse)

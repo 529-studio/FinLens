@@ -15,6 +15,7 @@ import { ResizableSplitView } from './ResizableSplitView';
 import { BoundingBoxOverlay } from '../pdf/BoundingBoxOverlay';
 import { PdfViewer } from '../pdf/PdfViewer';
 import { SettingsDialog } from '../settings/SettingsDialog';
+import { FootnoteChip } from '../chat/FootnoteChip';
 import {
   FileText,
   Send,
@@ -55,6 +56,7 @@ export const SplitView: FC<SplitViewProps> = ({ documentId, documentTitle }) => 
     ask,
     askComparative,
     focusEvidence,
+    focusFootnote,
     clearError,
   } = useVisualRag(documentId);
 
@@ -406,6 +408,35 @@ export const SplitView: FC<SplitViewProps> = ({ documentId, documentTitle }) => 
                               <ExternalLink className="w-3.5 h-3.5 flex-shrink-0" />
                               <span>P.{ev.page_number}: {ev.label}</span>
                             </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Footnote Disambiguation Chips */}
+                  {msg.footnotes && msg.footnotes.length > 0 && (
+                    <div className="pt-2 border-t border-slate-700/80">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-[11px] font-semibold text-amber-400/90 uppercase tracking-wider block">
+                          Thuyết minh BCTC liên quan (Footnotes):
+                        </span>
+                        <span className="text-[10px] font-medium bg-amber-950/70 border border-amber-800/60 text-amber-300 px-2 py-0.5 rounded-full">
+                          {msg.footnotes.length} Thuyết minh
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {msg.footnotes.map((fn, fnIdx) => {
+                          const isActive =
+                            activeEvidence?.page_number === fn.page_number &&
+                            activeEvidence?.label.includes(`TM ${fn.footnote_number}`);
+                          return (
+                            <FootnoteChip
+                              key={fnIdx}
+                              footnote={fn}
+                              isActive={isActive}
+                              onClick={focusFootnote}
+                            />
                           );
                         })}
                       </div>

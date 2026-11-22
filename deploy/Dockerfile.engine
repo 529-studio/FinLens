@@ -1,0 +1,66 @@
+# ==============================================================================
+# FinTrace Core Daemon Multi-Stage Container Image
+# Governed by 529 Engineering Standards:
+# - docker-runtime-patching-and-secrets
+# - Non-root container security (appuser: 10001)
+# - Python 3.12 slim base with minimal footprint
+# ==============================================================================
+
+# Stage 1: Build & Dependency Wheel Cache
+FROM python:3.12-slim AS builder
+
+WORKDIR /build
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY packages/core-engine/requirements.txt ./
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir --prefix=/install -r requirements.txt
+
+# Stage 2: Minimal Production Runtime
+FROM python:3.12-slim AS runner
+
+WORKDIR /app
+
+# Install runtime dependencies (curl for healthchecks, libgomp for lance/openmp)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    libgomp1 \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create non-root user & group (UID/GID 10001)
+RUN groupadd -g 10001 appgroup && \
+    useradd -u 10001 -g appgroup -s /bin/bash -m appuser
+
+# Copy installed Python packages from builder stage
+COPY --from=builder /install /usr/local
+
+# Copy application source code
+COPY packages/core-engine /app/packages/core-engine
+
+# Pre-create data directories with strict ownership
+RUN mkdir -p /home/appuser/.fintrace/lancedb \
+             /home/appuser/.fintrace/uploads \
+             /home/appuser/.fintrace/cache \
+             /home/appuser/.finsight \
+    && chown -R appuser:appgroup /home/appuser/.fintrace /home/appuser/.finsight /app
+
+USER 10001:10001
+WORKDIR /app/packages/core-engine
+
+ENV PYTHONPATH=/app/packages/core-engine/src \
+    PYTHONUNBUFFERED=1 \
+    HOME=/home/appuser \
+    FINTRACE_DAEMON_HOST=0.0.0.0 \
+    FINTRACE_DAEMON_PORT=8765
+
+EXPOSE 8765
+
+HEALTHCHECK --interval=10s --timeout=5s --start-period=10s --retries=3 \
+    CMD curl -f http://127.0.0.1:8765/health || exit 1
+
+CMD ["python", "src/main.py"]

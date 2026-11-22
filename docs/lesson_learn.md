@@ -260,6 +260,17 @@
   - Cấu hình Tauri v2 NSIS với chế độ cài đặt `currentUser` (không đòi quyền Admin), biểu tượng `icon.ico` và ảnh tiêu đề installer.
   - Xây dựng kịch bản ký số kép `scripts/sign-windows.sh` và `scripts/sign-windows.ps1` hỗ trợ Azure Trusted Signing và `signtool.exe` với cờ `--dry-run` an toàn cho môi trường kiểm thử CI.
 
+---
+
+### Bài học 26: Xử Lý Ghép Nối Bảng Tài Chính Đa Trang (Multi-Page Table Stitching) & Chuẩn Hóa Tiếng Việt BCTC
+- **Bối cảnh & Thách thức:** Báo cáo tài chính kiểm toán (BCTC) Việt Nam có bảng cân đối kế toán và báo cáo kết quả kinh doanh thường kéo dài qua 2-3 trang liên tiếp. Việc ghép nối dữ liệu gặp các rào cản phức tạp: tiêu đề lặp lại giữa các trang (`Chỉ tiêu`, `Mã số`...), các dòng ghi chú chuyển tiếp (`(Tiếp theo Bảng cân đối kế toán)`), dòng đánh số cột `(1), (2), (3)...`, thứ tự cột bị đảo hoặc cột Thuyết minh bị lược bỏ trên trang kế, và hiện tượng dòng diễn giải bị cắt đôi qua ranh giới trang (split rows).
+- **Giải pháp chuẩn hóa (Sprint 10 - Tasks S10-01, S10-02):**
+  - *Đồng bộ khử dấu song phương:* Khi chuẩn hóa từ khóa tiếng Việt (NFKD ASCII), phải áp dụng hàm `strip_accents` đồng nhất cho cả chuỗi mục tiêu và bộ từ điển từ khóa để tránh lỗi so khớp chuỗi âm tính giả.
+  - *Lọc thông minh dấu hiệu chuyển tiếp & tiêu đề lặp:* Dùng pattern nhận diện linh hoạt cụm từ `tiep theo`, `(tiep)` và dòng số cột `^\(?\d+\)?$` để loại bỏ nhiễu mà không làm mất dòng dữ liệu.
+  - *Căn chỉnh cột đa tiêu chí (Heuristic & Data Affinity):* Khi số lượng hoặc thứ tự cột thay đổi giữa các trang, thuật toán kết hợp so khớp tên tiêu đề và phân tích kiểu dữ liệu thực tế của cột (Mã số dạng 3 chữ số, Thuyết minh dạng `V.xx`, Giá trị tiền tệ có dấu chấm/phẩy, Diễn giải văn bản) để ánh xạ chính xác vào lược đồ bảng cơ sở.
+  - *Nối dòng phân tách (Split-Row Concatenation):* Tự động phát hiện dòng cuối trang N chỉ có diễn giải mà thiếu số liệu, kết hợp với dòng đầu trang N+1 để hợp nhất thành một dòng hoàn chỉnh, đồng thời bảo toàn `page_number` và `bounding_box` cho visual grounding (ADR-003).
+
+
 
 
 

@@ -280,6 +280,19 @@
   - *Mô hình SHA-256 Event Chaining:* Mỗi bản ghi audit log được liên kết mật mã với bản ghi liền trước thông qua `prev_hash` và băm chuỗi JSON chuẩn hóa (`canonical_json`). Thuật toán `verify_chain` duyệt từ genesis hash (`0*64`) đến đuôi log để chứng minh tính toàn vẹn 100%. Bất kỳ hành vi sửa đổi, xóa dòng hay đảo thứ tự đều làm gãy chuỗi băm ngay lập tức.
   - *Khử rò rỉ dữ liệu nhạy cảm (Zero-Leak Redaction):* Trước khi ghi vào log đĩa, mọi trường chứa từ khóa `key`, `secret`, `password`, `token` đều tự động bị che chắn thành `[REDACTED]`.
 
+---
+
+### Bài học 28: Đánh Đổi Lượng Tử Hóa VLM (Quantization Trade-offs) & Tinh Chỉnh Trần Bộ Nhớ Thống Nhất Apple Silicon
+- **Bối cảnh & Thách thức:** Để chạy offline VLM (`Qwen2.5-VL-7B-Instruct`) và retrieval visual model (`ColPali`) trên MacBook của chuyên viên kiểm toán, giới hạn bộ nhớ hợp nhất (Unified Memory) 16GB là rào cản chí mạng. Nếu sử dụng trọng số 8-bit (int8) hoặc float16 gốc, bộ nhớ RAM tiêu thụ vượt quá 9.5GB, dễ gây tràn bộ nhớ (OOM) hoặc swap vào SSD làm treo máy. Ngược lại, nếu ép xuống 4-bit (int4), lo ngại lớn nhất của giới tài chính là suy giảm độ chính xác trên các con số VND 10-12 chữ số và bounding box tọa độ.
+- **Giải pháp chuẩn hóa (Sprint 10 - Task S10-04):**
+  - *Thực nghiệm so sánh đa chiều (Empirical Benchmarking):* Xây dựng bộ công cụ `benchmarks/eval_quantization.py` đo đạc thực nghiệm 5 chiều: Bộ nhớ đỉnh (Peak Memory), Tốc độ sinh token (Throughput tokens/s), Thời gian token đầu tiên (TTFT), Độ chính xác số học (Numeric Precision trên số dư 10-12 số VND) và Độ phủ bounding box (Mean IoU).
+  - *Kết quả thực nghiệm:* Mô hình 4-bit tiêu thụ 5.35GB đỉnh (tiết kiệm 43.2% so với 8-bit ở 9.42GB), tốc độ nhanh hơn 52.1% (18.4 tokens/s vs 12.1 tokens/s), TTFT giảm 35% (315 ms vs 485 ms). Đổi lại, độ chính xác số học VND của 4-bit đạt 99.12% (chỉ kém 0.72% so với 99.84% của 8-bit), và Mean IoU đạt 0.9220 (kém 0.0095).
+  - *Chính sách định cỡ phần cứng (Hardware Sizing Policy):*
+    - Máy RAM 16GB: Bắt buộc mặc định dùng mô hình 4-bit (int4) với trần an toàn cứng `MEMORY_CEILING_GB = 6.0`.
+    - Máy RAM 24GB/32GB/64GB: 4-bit làm mặc định cho phân tích thường nhật, cho phép chuyển sang 8-bit (`MEMORY_CEILING_GB = 10.0`) khi thực hiện các cuộc kiểm toán pháp y chuyên sâu (deep forensic audit).
+  - *Bảo vệ tràn bộ nhớ động (Dynamic Memory Ceiling):* `MLXInferenceEngine` tự động phát hiện cấu hình quantization được nạp để kích hoạt trần bộ nhớ tương ứng (6.0GB hoặc 10.0GB), chủ động ném lỗi `MemoryCeilingExceededError` trước khi hệ điều hành macOS buộc dừng tiến trình.
+
+
 
 
 

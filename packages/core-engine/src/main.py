@@ -63,7 +63,7 @@ from mlx_engine import MLXEngine
 
 app = FastAPI(
     title="FinTrace Visual Financial RAG Daemon",
-    version="0.1.0",
+    version="1.0.0",
     description="Local daemon serving visual search, VLM grounding, and financial analytics.",
 )
 

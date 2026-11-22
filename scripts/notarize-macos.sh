@@ -41,9 +41,11 @@ echo "========================================================================"
 
 if [[ -z "$TARGET_PATH" ]]; then
     # Look for default dmg bundle in apps/desktop
-    DEFAULT_DMG="apps/desktop/src-tauri/target/release/bundle/dmg/FinTrace_0.1.0_aarch64.dmg"
+    DEFAULT_DMG="apps/desktop/src-tauri/target/release/bundle/dmg/FinTrace_1.0.0_aarch64.dmg"
     if [[ -f "$DEFAULT_DMG" ]]; then
         TARGET_PATH="$DEFAULT_DMG"
+    elif [[ -f "apps/desktop/src-tauri/target/release/bundle/dmg/FinTrace_0.1.0_aarch64.dmg" ]]; then
+        TARGET_PATH="apps/desktop/src-tauri/target/release/bundle/dmg/FinTrace_0.1.0_aarch64.dmg"
     elif [[ -f "apps/desktop/src-tauri/target/release/bundle/dmg/FinSight_0.1.0_aarch64.dmg" ]]; then
         TARGET_PATH="apps/desktop/src-tauri/target/release/bundle/dmg/FinSight_0.1.0_aarch64.dmg"
     elif [[ -f "apps/desktop/src-tauri/target/release/bundle/macos/FinTrace.app" ]]; then

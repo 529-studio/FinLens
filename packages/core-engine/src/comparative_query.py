@@ -222,3 +222,233 @@ def compute_portfolio_summary(
         fastest_growing_entity=fastest_grower,
         highest_margin_entity=highest_margin_entity,
     )
+
+
+def parse_financial_value(val: Any) -> Optional[float]:
+    """Extracts clean float representation from formatted financial numbers or strings."""
+    if val is None:
+        return None
+    if isinstance(val, (int, float)):
+        return float(val)
+    if isinstance(val, str):
+        cleaned = re.sub(r"[^\d\.,\-]", "", val).strip()
+        if not cleaned:
+            return None
+        if "." in cleaned and "," in cleaned:
+            if cleaned.rfind(",") > cleaned.rfind("."):
+                cleaned = cleaned.replace(".", "").replace(",", ".")
+            else:
+                cleaned = cleaned.replace(",", "")
+        elif "." in cleaned:
+            parts = cleaned.split(".")
+            if len(parts) == 2 and len(parts[1]) == 3 and int(parts[0]) > 0:
+                cleaned = parts[0] + parts[1]
+        elif "," in cleaned:
+            parts = cleaned.split(",")
+            if len(parts) == 2 and len(parts[1]) == 3 and int(parts[0]) > 0:
+                cleaned = parts[0] + parts[1]
+            else:
+                cleaned = cleaned.replace(",", ".")
+        try:
+            return float(cleaned)
+        except ValueError:
+            return None
+    return None
+
+
+def canonicalize_metric_name(raw_name: str) -> str:
+    """Maps Vietnamese or multi-language metric names to canonical metric keys."""
+    raw = raw_name.lower()
+    if any(k in raw for k in ["doanh thu", "revenue", "sales"]):
+        return "revenue"
+    if any(k in raw for k in ["lợi nhuận gộp", "gross profit"]):
+        return "gross_profit"
+    if any(k in raw for k in ["lợi nhuận sau thuế", "lợi nhuận thuần", "net profit", "net income", "profit after tax"]):
+        return "net_profit"
+    if any(k in raw for k in ["biên lợi nhuận gộp", "gross margin"]):
+        return "gross_margin"
+    if any(k in raw for k in ["biên lợi nhuận ròng", "biên lợi nhuận thuần", "net margin"]):
+        return "net_margin"
+    return re.sub(r"[^a-zA-Z0-9_]+", "_", raw).strip("_") or "metric"
+
+
+class PortfolioSynthesisEngine:
+    """
+    Decoupled domain coordinator for multi-document portfolio synthesis and cross-filing comparative analytics.
+    Injected with DocumentStore, VisualRetriever, and VlmRouter dependencies.
+    """
+
+    def __init__(self, store: Any, retriever: Any, router: Any):
+        self.store = store
+        self.retriever = retriever
+        self.router = router
+
+    async def synthesize(self, req: PortfolioSynthesisRequest) -> PortfolioSynthesisResponse:
+        start_time = time.time()
+
+        # 1. Existence check for all target documents
+        for target in req.documents:
+            pages = self.store.get_pages(target.document_id)
+            if not pages:
+                raise FileNotFoundError(f"Document '{target.document_id}' not found in index. Please ingest it first.")
+
+        # 2. Partitioned multi-document retrieval
+        doc_ids = [target.document_id for target in req.documents]
+        retrieved_pages_map = self.retriever.comparative_search(
+            doc_ids,
+            req.query_text or "So sánh tài chính",
+            top_k_per_doc=1,
+        )
+
+        # 3. Assemble document pages mapping with image paths
+        doc_pages: Dict[str, List[Tuple[str, int]]] = {}
+        for doc_id, page_nums in retrieved_pages_map.items():
+            stored_pages = self.store.get_pages(doc_id)
+            page_dict = {p["page_number"]: p["image_path"] for p in stored_pages}
+            doc_pages[doc_id] = []
+            for p_num in page_nums:
+                img_path = page_dict.get(p_num)
+                if img_path:
+                    doc_pages[doc_id].append((img_path, p_num))
+
+        # 4. Dispatch visual comparative inference
+        vlm_res = await self.router.analyze_comparative(
+            doc_pages=doc_pages,
+            query=req.query_text or "So sánh tài chính",
+            preferred_mode=req.inference_mode,
+        )
+
+        # 5. Extract and normalize GroundedEvidence
+        evidences: List[GroundedEvidence] = []
+        for e in vlm_res.get("evidences", []):
+            evidences.append(
+                GroundedEvidence(
+                    page_number=e["page_number"],
+                    bounding_box=BoundingBox(
+                        ymin=e["ymin"],
+                        xmin=e["xmin"],
+                        ymax=e["ymax"],
+                        xmax=e["xmax"],
+                    ),
+                    label=e["label"],
+                    extracted_value=e.get("extracted_value"),
+                    confidence=e["confidence"],
+                    document_id=e.get("document_id"),
+                )
+            )
+
+        # 6. Resolve metadata and map document_id -> (entity, period)
+        doc_meta: Dict[str, Tuple[str, str]] = {}
+        for target in req.documents:
+            stored_pages = self.store.get_pages(target.document_id)
+            ent, per = resolve_target_metadata(target, stored_pages)
+            doc_meta[target.document_id] = (ent, per)
+
+        # 7. Build time series metrics from comparative_metrics
+        comparative_metrics = vlm_res.get("comparative_metrics", [])
+        time_series = self._build_time_series(
+            comparative_metrics=comparative_metrics,
+            doc_meta=doc_meta,
+            evidences=evidences,
+            metrics_requested=req.metrics_requested,
+        )
+
+        # 8. Compute peer rankings
+        primary_metric = "revenue"
+        peer_rankings = rank_entities_by_metric(time_series, metric_name=primary_metric)
+        if not peer_rankings and time_series:
+            peer_rankings = rank_entities_by_metric(time_series, metric_name=time_series[0].metric)
+
+        # 9. Compute portfolio summary
+        summary = compute_portfolio_summary(time_series, peer_rankings)
+
+        duration_ms = (time.time() - start_time) * 1000.0
+
+        return PortfolioSynthesisResponse(
+            portfolio_summary=summary,
+            time_series_metrics=time_series,
+            peer_rankings=peer_rankings,
+            synthesis_narrative=vlm_res.get("answer", "Portfolio synthesis complete."),
+            evidences=evidences,
+            retrieved_pages=retrieved_pages_map,
+            latency_ms=round(duration_ms, 2),
+            engine_used=vlm_res.get("engine", "unknown"),
+        )
+
+    def _build_time_series(
+        self,
+        comparative_metrics: List[Dict[str, Any]],
+        doc_meta: Dict[str, Tuple[str, str]],
+        evidences: List[GroundedEvidence],
+        metrics_requested: List[str],
+    ) -> List[EntityMetricSeries]:
+        """
+        Groups extracted metrics by (entity, metric), calculates YoY and CAGR, and attaches GroundedEvidence.
+        """
+        # (entity, canonical_metric) -> List[TimeSeriesDataPoint]
+        grouped: Dict[Tuple[str, str], List[TimeSeriesDataPoint]] = {}
+
+        for m in comparative_metrics:
+            raw_name = m.get("metric", "metric")
+            canonical_name = canonicalize_metric_name(raw_name)
+            unit = m.get("unit", "VND")
+            doc_values = m.get("doc_values", {})
+
+            for doc_id, val_str in doc_values.items():
+                if doc_id not in doc_meta:
+                    continue
+                entity, period = doc_meta[doc_id]
+                val_float = parse_financial_value(val_str)
+
+                # Match evidence by doc_id
+                matched_evidence = None
+                for ev in evidences:
+                    if ev.document_id == doc_id:
+                        matched_evidence = ev
+                        break
+
+                key = (entity, canonical_name)
+                if key not in grouped:
+                    grouped[key] = []
+
+                grouped[key].append(
+                    TimeSeriesDataPoint(
+                        period=period,
+                        value=val_float,
+                        unit=unit,
+                        evidence=matched_evidence,
+                    )
+                )
+
+        series_list: List[EntityMetricSeries] = []
+        for (entity, metric_name), points in grouped.items():
+            # Sort points by period (e.g. 2021 -> 2022 -> 2023)
+            points.sort(key=lambda p: p.period)
+
+            # Compute YoY growth between consecutive periods
+            for i in range(1, len(points)):
+                points[i].yoy_growth = calculate_yoy(points[i - 1].value, points[i].value)
+
+            # Compute CAGR if >= 2 points
+            cagr = None
+            if len(points) >= 2 and points[0].value and points[-1].value:
+                p_start = points[0].period
+                p_end = points[-1].period
+                if p_start.isdigit() and p_end.isdigit():
+                    n_years = int(p_end) - int(p_start)
+                else:
+                    n_years = len(points) - 1
+                if n_years > 0:
+                    cagr = calculate_cagr(points[0].value, points[-1].value, n_years)
+
+            series_list.append(
+                EntityMetricSeries(
+                    entity=entity,
+                    metric=metric_name,
+                    series=points,
+                    cagr=cagr,
+                )
+            )
+
+        return series_list
+

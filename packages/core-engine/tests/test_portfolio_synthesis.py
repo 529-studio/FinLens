@@ -29,6 +29,7 @@ from comparative_query import (
     calculate_margins,
     rank_entities_by_metric,
     compute_portfolio_summary,
+    PortfolioSynthesisEngine,
 )
 
 
@@ -259,4 +260,107 @@ def test_compute_portfolio_summary():
     assert summary.total_periods == 1
     assert summary.portfolio_revenue_aggregate == 150000.0
     assert summary.fastest_growing_entity == "HPG"
+
+
+@pytest.mark.anyio
+async def test_engine_synthesize_missing_doc_raises_error():
+    """Verify that an unindexed document ID raises FileNotFoundError."""
+    from unittest.mock import MagicMock
+
+    store = MagicMock()
+    store.get_pages.side_effect = lambda doc_id: [] if doc_id == "MISSING_DOC" else [{"page_number": 1, "image_path": "/tmp/1.png"}]
+    retriever = MagicMock()
+    retriever.store = store
+    router = MagicMock()
+
+    engine = PortfolioSynthesisEngine(store=store, retriever=retriever, router=router)
+    req = PortfolioSynthesisRequest(
+        documents=[
+            PortfolioDocumentTarget(document_id="VNM_2022"),
+            PortfolioDocumentTarget(document_id="MISSING_DOC"),
+        ]
+    )
+    with pytest.raises(FileNotFoundError) as exc_info:
+        await engine.synthesize(req)
+    assert "MISSING_DOC" in str(exc_info.value)
+
+
+@pytest.mark.anyio
+async def test_engine_synthesize_success_mocked():
+    """Verify end-to-end synthesis coordination with mock store, retriever, and router."""
+    from unittest.mock import MagicMock, AsyncMock
+
+    store = MagicMock()
+    store.get_pages.side_effect = lambda doc_id: [
+        {"page_number": 1, "image_path": f"/tmp/{doc_id}_p1.png", "text_preview": f"BCTC {doc_id}"}
+    ]
+    retriever = MagicMock()
+    retriever.store = store
+    retriever.comparative_search.return_value = {
+        "VNM_2022": [1],
+        "VNM_2023": [1],
+    }
+
+    mock_evidences = [
+        {
+            "page_number": 1,
+            "ymin": 200,
+            "xmin": 100,
+            "ymax": 250,
+            "xmax": 900,
+            "label": "Doanh thu thuần",
+            "extracted_value": "59,925",
+            "confidence": 0.95,
+            "document_id": "VNM_2022",
+        },
+        {
+            "page_number": 1,
+            "ymin": 210,
+            "xmin": 110,
+            "ymax": 260,
+            "xmax": 910,
+            "label": "Doanh thu thuần",
+            "extracted_value": "60,478",
+            "confidence": 0.97,
+            "document_id": "VNM_2023",
+        },
+    ]
+
+    mock_vlm_res = {
+        "engine": "mock-mlx-engine",
+        "answer": "Vinamilk duy trì tăng trưởng doanh thu 0.92% YoY.",
+        "comparative_metrics": [
+            {
+                "metric": "Doanh thu thuần",
+                "unit": "tỷ VNĐ",
+                "doc_values": {"VNM_2022": "59,925", "VNM_2023": "60,478"},
+                "yoy_growth": "+0.92%",
+            }
+        ],
+        "evidences": mock_evidences,
+    }
+
+    router = MagicMock()
+    router.analyze_comparative = AsyncMock(return_value=mock_vlm_res)
+
+    engine = PortfolioSynthesisEngine(store=store, retriever=retriever, router=router)
+    req = PortfolioSynthesisRequest(
+        documents=[
+            PortfolioDocumentTarget(document_id="VNM_2022", entity="VNM", period="2022"),
+            PortfolioDocumentTarget(document_id="VNM_2023", entity="VNM", period="2023"),
+        ],
+        query_text="So sánh tăng trưởng doanh thu",
+    )
+
+    res = await engine.synthesize(req)
+    assert res.engine_used == "mock-mlx-engine"
+    assert res.portfolio_summary.total_entities == 1
+    assert res.portfolio_summary.total_periods == 2
+    assert len(res.time_series_metrics) >= 1
+    assert len(res.evidences) == 2
+    for ev in res.evidences:
+        assert 0 <= ev.bounding_box.ymin < ev.bounding_box.ymax <= 1000
+        assert 0 <= ev.bounding_box.xmin < ev.bounding_box.xmax <= 1000
+        assert ev.document_id in ["VNM_2022", "VNM_2023"]
+
 

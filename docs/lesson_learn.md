@@ -302,6 +302,20 @@
   - *Chuẩn hóa sai số dấu phẩy động IEEE-754:* Các phép nhân dải số thập phân (ví dụ: `50000 * 1.1 = 55000.00000000001`) được làm tròn an toàn qua `Math.round((val + Number.EPSILON) * 1e9) / 1e9`, bảo đảm tính toán chính xác tuyệt đối.
   - *Công thái học Kiosk $\ge 48\text{px}$ & 3 trạng thái giao diện:* Toàn bộ slider, nút bước nhảy, nút hoàn tác, chip kịch bản định sẵn (Bi quan, Thận trọng, Lạc quan, Căng thẳng), nút mở ngăn kéo kiểm toán và nút đồng bộ vào sheet đều đạt chuẩn chiều cao tối thiểu 48px, 100% icon vector SVG Lucide React, và xử lý mượt mà cả 3 trạng thái Skeleton Loading, Error với nút Thử lại, và Actionable Empty state.
 
+---
+
+### Bài học 30: Tổng Hợp Danh Mục BCTC Đa Kỳ (Multi-Document Portfolio Synthesis), Tính Toán CAGR Xác Định & Phân Giải Metadata Lai (Hybrid Graceful Degradation)
+- **Bối cảnh & Thách thức:** Chuyên viên phân tích tài chính cao cấp khi rà soát danh mục đầu tư hoặc thẩm định sáp nhập (M&A) cần tổng hợp đồng thời nhiều báo cáo tài chính của cùng một doanh nghiệp qua nhiều năm (ví dụ VNM 2021-2023) hoặc giữa nhóm doanh nghiệp đối thủ cùng ngành (peer group). Thách thức đặt ra là: dữ liệu đầu vào có thể không chuẩn hóa về metadata (tên file hoặc ID khác nhau), tính toán tỷ lệ tăng trưởng kép hàng năm (CAGR) và biến động biên lợi nhuận dễ gặp lỗi chia cho 0 hoặc căn bậc số âm, và quan trọng nhất là toàn bộ số liệu tổng hợp trong danh mục phải bảo toàn liên kết bằng chứng thị giác (Visual Grounding ADR-003) với tọa độ chuẩn hóa $[0, 1000]$.
+- **Giải pháp chuẩn hóa (Sprint 11 - Task S11-01):**
+  - *Mô hình phân giải Metadata Lai (Hybrid Graceful Degradation):* Cho phép client gửi danh mục linh hoạt. Ưu tiên sử dụng `entity` và `period` tường minh nếu được cung cấp; nếu bỏ trống, engine tự động kích hoạt fallback chuỗi regex trên `document_id` (ví dụ `VNM_2023_AUDITED` -> entity: `VNM`, period: `2023`), tiếp tục fallback kiểm tra trang lưu trữ LanceDB trước khi xác nhận bằng VLM.
+  - *Bộ tính toán tài chính xác định (Deterministic Financial Math):*
+    - CAGR: $CAGR = (V_n / V_0)^{1/n} - 1$, xử lý nghiêm ngặt điều kiện biên: nếu $V_0 \le 0$ hoặc $V_n \le 0$ thì trả về `None` thay vì sinh lỗi toán học hay `NaN`.
+    - YoY Growth: Chuẩn hóa sai số dấu phẩy động IEEE-754 với làm tròn 4 chữ số thập phân và bảo vệ phép chia cho 0.
+    - Xếp hạng Peer Group: Tự động sắp xếp các thực thể theo doanh thu hoặc biên lợi nhuận và xếp hạng $1, 2, \dots, K$.
+  - *Bảo toàn 100% Visual Grounding (ADR-003):* Mỗi điểm dữ liệu chuỗi thời gian đều giữ nguyên đối tượng `GroundedEvidence` gốc kèm `document_id`, `page_number` và `bounding_box` $[ymin, xmin, ymax, xmax]$ tỷ lệ $[0, 1000]$ phục vụ nhấp chuyển trang trên PDF viewer.
+  - *Phòng thủ Path Traversal & Giới hạn tài nguyên:* Mọi `document_id` đều được kiểm tra chặt chẽ bằng regex `^[a-zA-Z0-9_\-]+$`, giới hạn tối đa 10 tài liệu/request để giữ trần bộ nhớ Apple Silicon Metal $< 6.0\text{ GB}$.
+
+
 
 
 

@@ -31,6 +31,12 @@ from comparative_query import (
     compute_portfolio_summary,
     PortfolioSynthesisEngine,
 )
+from fastapi.testclient import TestClient
+from main import app
+
+client = TestClient(app)
+REPO_ROOT = Path(__file__).resolve().parents[3]
+SAMPLE_PDF = str(REPO_ROOT / "benchmarks" / "data" / "VNM_BCTC_2023_AUDITED.pdf")
 
 
 def test_portfolio_contracts_validation_success():
@@ -362,5 +368,88 @@ async def test_engine_synthesize_success_mocked():
         assert 0 <= ev.bounding_box.ymin < ev.bounding_box.ymax <= 1000
         assert 0 <= ev.bounding_box.xmin < ev.bounding_box.xmax <= 1000
         assert ev.document_id in ["VNM_2022", "VNM_2023"]
+
+
+@pytest.fixture(scope="module")
+def setup_test_documents():
+    """Ensure setup documents are ingested in LanceDB store for API integration testing."""
+    for doc_id in ["VNM_2022_PORT", "VNM_2023_PORT"]:
+        payload = {
+            "file_path": SAMPLE_PDF,
+            "document_id": doc_id,
+            "render_dpi": 150,
+        }
+        res = client.post("/api/v1/documents/ingest", json=payload)
+        assert res.status_code == 200, f"Failed to ingest {doc_id}: {res.text}"
+
+
+def test_api_portfolio_synthesize_success(setup_test_documents):
+    """Verify live API endpoint POST /api/v1/portfolio/synthesize returns 200 and complete schema."""
+    payload = {
+        "documents": [
+            {"document_id": "VNM_2022_PORT", "entity": "VNM", "period": "2022"},
+            {"document_id": "VNM_2023_PORT", "entity": "VNM", "period": "2023"},
+        ],
+        "query_text": "So sánh cơ cấu doanh thu và biên lợi nhuận",
+        "metrics_requested": ["revenue", "gross_profit", "net_profit"],
+        "inference_mode": "auto",
+    }
+    res = client.post("/api/v1/portfolio/synthesize", json=payload)
+    assert res.status_code == 200, f"Endpoint failed: {res.text}"
+    data = res.json()
+
+    assert "portfolio_summary" in data
+    assert data["portfolio_summary"]["total_entities"] == 1
+    assert data["portfolio_summary"]["total_periods"] == 2
+    assert "time_series_metrics" in data
+    assert "peer_rankings" in data
+    assert "evidences" in data
+    assert len(data["evidences"]) >= 2
+    for ev in data["evidences"]:
+        assert ev["document_id"] in ["VNM_2022_PORT", "VNM_2023_PORT"]
+        assert 0 <= ev["bounding_box"]["ymin"] < ev["bounding_box"]["ymax"] <= 1000
+    assert data["latency_ms"] > 0
+
+
+def test_api_portfolio_synthesize_path_traversal():
+    """Verify path traversal attack is blocked on POST /api/v1/portfolio/synthesize."""
+    payload = {
+        "documents": [
+            {"document_id": "../../etc/passwd"},
+            {"document_id": "VNM_2023_PORT"},
+        ],
+        "query_text": "test path traversal",
+    }
+    res = client.post("/api/v1/portfolio/synthesize", json=payload)
+    assert res.status_code in [400, 422], f"Expected 400 or 422, got {res.status_code}"
+
+
+def test_api_portfolio_synthesize_missing_document(setup_test_documents):
+    """Verify missing document returns 404."""
+    payload = {
+        "documents": [
+            {"document_id": "VNM_2022_PORT"},
+            {"document_id": "NON_EXISTENT_DOC_999"},
+        ],
+        "query_text": "test missing doc",
+    }
+    res = client.post("/api/v1/portfolio/synthesize", json=payload)
+    assert res.status_code == 404
+    assert "NON_EXISTENT_DOC_999" in res.json()["detail"]
+
+
+def test_api_portfolio_synthesize_unauthorized_token():
+    """Verify invalid JWT returns 401 Unauthorized."""
+    payload = {
+        "documents": [
+            {"document_id": "VNM_2022_PORT"},
+            {"document_id": "VNM_2023_PORT"},
+        ],
+        "query_text": "test unauthorized",
+    }
+    headers = {"Authorization": "Bearer invalid.malformed.jwt"}
+    res = client.post("/api/v1/portfolio/synthesize", json=payload, headers=headers)
+    assert res.status_code == 401
+
 
 

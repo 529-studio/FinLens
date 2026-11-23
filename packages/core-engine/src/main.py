@@ -47,8 +47,11 @@ from contracts import (
     FootnoteItem,
     TableStitchRequest,
     TableStitchResponse,
+    PortfolioSynthesisRequest,
+    PortfolioSynthesisResponse,
 )
 from table_stitcher import TableStitcher
+from comparative_query import PortfolioSynthesisEngine
 from auth import (
     Role,
     Permission,
@@ -98,6 +101,7 @@ model_manager = ModelManager()
 mlx_engine = MLXEngine(model_manager=model_manager)
 cloud_router = CloudRouter()
 router = VlmRouter(mlx_engine=mlx_engine, cloud_router=cloud_router)
+portfolio_engine = PortfolioSynthesisEngine(store=retriever.store, retriever=retriever, router=router)
 
 
 @app.get("/health")
@@ -750,6 +754,43 @@ async def query_comparative_documents(req: ComparativeQueryRequest, user: User =
         engine_used=vlm_res["engine"],
         latency_ms=round(duration_ms, 2),
     )
+
+
+@app.post("/api/v1/portfolio/synthesize", response_model=PortfolioSynthesisResponse)
+async def synthesize_portfolio_endpoint(
+    req: PortfolioSynthesisRequest,
+    user: User = Depends(require_permission(Permission.DOC_READ)),
+):
+    """
+    Synthesizes multi-document financial portfolios, calculating YoY growth, CAGR, margin trajectories,
+    and peer group rankings while preserving 100% visual grounding citations.
+    Enforces path traversal defense and enterprise RBAC authorization.
+    """
+    for target in req.documents:
+        if not re.match(r"^[a-zA-Z0-9_\-]+$", target.document_id) or ".." in target.document_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Access denied: Invalid or malicious document_id '{target.document_id}' (path traversal rejected)",
+            )
+        pages = retriever.store.get_pages(target.document_id)
+        if not pages:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Document '{target.document_id}' not found in index. Please ingest it first.",
+            )
+
+    try:
+        return await portfolio_engine.synthesize(req)
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Portfolio synthesis failed: {str(e)}",
+        )
+
 
 
 @app.post("/api/v1/query/footnotes", response_model=FootnoteQueryResponse)

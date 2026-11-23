@@ -22,6 +22,14 @@ from contracts import (
     BoundingBox,
     GroundedEvidence,
 )
+from comparative_query import (
+    resolve_target_metadata,
+    calculate_yoy,
+    calculate_cagr,
+    calculate_margins,
+    rank_entities_by_metric,
+    compute_portfolio_summary,
+)
 
 
 def test_portfolio_contracts_validation_success():
@@ -133,3 +141,122 @@ def test_portfolio_contracts_document_count_bounds():
     excessive_docs = [PortfolioDocumentTarget(document_id=f"DOC_{i}") for i in range(11)]
     with pytest.raises(ValidationError):
         PortfolioSynthesisRequest(documents=excessive_docs)
+
+
+def test_resolve_target_metadata_explicit():
+    """Verify that explicitly provided entity and period are honored directly."""
+    target = PortfolioDocumentTarget(
+        document_id="CUSTOM_ID_001",
+        entity="Vinamilk Corp",
+        period="2023",
+    )
+    entity, period = resolve_target_metadata(target)
+    assert entity == "Vinamilk Corp"
+    assert period == "2023"
+
+
+def test_resolve_target_metadata_regex_fallback():
+    """Verify regex fallback extraction from document_id patterns."""
+    cases = [
+        ("VNM_2023_AUDITED", ("VNM", "2023")),
+        ("HPG-2022-ANNUAL", ("HPG", "2022")),
+        ("VIC_2021", ("VIC", "2021")),
+        ("FPT_Q4_2023_REPORT", ("FPT", "2023")),
+        ("UNKNOWNFILING", ("UNKNOWNFILING", "UNKNOWN")),
+    ]
+    for doc_id, expected in cases:
+        target = PortfolioDocumentTarget(document_id=doc_id)
+        entity, period = resolve_target_metadata(target)
+        assert (entity, period) == expected, f"Failed on {doc_id}: got {(entity, period)}, expected {expected}"
+
+
+def test_calculate_yoy_standard_and_edge_cases():
+    """Verify YoY growth calculations and boundary handling."""
+    # Standard positive growth: 100 -> 115 => +15.0%
+    assert calculate_yoy(100.0, 115.0) == 15.0
+    # Standard negative growth: 100 -> 85 => -15.0%
+    assert calculate_yoy(100.0, 85.0) == -15.0
+    # Floating point precision check: 50.0 -> 55.0 => +10.0%
+    assert calculate_yoy(50.0, 55.0) == 10.0
+    # Base is zero: division by zero returns None
+    assert calculate_yoy(0.0, 100.0) is None
+    # Base is negative: using |v_prev|
+    assert calculate_yoy(-50.0, -40.0) == 20.0
+    # None inputs
+    assert calculate_yoy(None, 100.0) is None
+    assert calculate_yoy(100.0, None) is None
+
+
+def test_calculate_cagr_multi_year():
+    """Verify Compound Annual Growth Rate (CAGR) formula and boundaries."""
+    # 3-year CAGR: 100 -> 133.1 over 3 years => 10.0%
+    cagr = calculate_cagr(100.0, 133.1, n_years=3)
+    assert cagr is not None
+    assert round(cagr * 100.0, 2) == 10.0
+
+    # 1-year CAGR matches YoY: 100 -> 120 over 1 year => 20.0%
+    cagr_1yr = calculate_cagr(100.0, 120.0, n_years=1)
+    assert cagr_1yr is not None
+    assert round(cagr_1yr * 100.0, 2) == 20.0
+
+    # Non-positive starting or ending values return None
+    assert calculate_cagr(0.0, 100.0, n_years=2) is None
+    assert calculate_cagr(-50.0, 100.0, n_years=2) is None
+    assert calculate_cagr(100.0, -20.0, n_years=2) is None
+    assert calculate_cagr(100.0, 0.0, n_years=2) is None
+    # Invalid years
+    assert calculate_cagr(100.0, 120.0, n_years=0) is None
+    assert calculate_cagr(100.0, 120.0, n_years=-1) is None
+
+
+def test_calculate_margins():
+    """Verify gross and net margin percentage calculations."""
+    gross_m, net_m = calculate_margins(1000.0, 400.0, 150.0)
+    assert gross_m == 40.0
+    assert net_m == 15.0
+
+    # Zero or None revenue returns None
+    assert calculate_margins(0.0, 100.0, 50.0) == (None, None)
+    assert calculate_margins(None, 100.0, 50.0) == (None, None)
+    # Missing profits
+    assert calculate_margins(1000.0, None, 150.0) == (None, 15.0)
+
+
+def test_rank_entities_by_metric():
+    """Verify peer group ranking ordering by specified metric."""
+    p1 = TimeSeriesDataPoint(period="2023", value=60000.0)
+    p2 = TimeSeriesDataPoint(period="2023", value=45000.0)
+    p3 = TimeSeriesDataPoint(period="2023", value=90000.0)
+
+    s1 = EntityMetricSeries(entity="VNM", metric="revenue", series=[p1])
+    s2 = EntityMetricSeries(entity="QNS", metric="revenue", series=[p2])
+    s3 = EntityMetricSeries(entity="HPG", metric="revenue", series=[p3])
+
+    rankings = rank_entities_by_metric([s1, s2, s3], metric_name="revenue", target_period="2023")
+    assert len(rankings) == 3
+    assert rankings[0].entity == "HPG"
+    assert rankings[0].rank == 1
+    assert rankings[0].metric_value == 90000.0
+    assert rankings[1].entity == "VNM"
+    assert rankings[1].rank == 2
+    assert rankings[2].entity == "QNS"
+    assert rankings[2].rank == 3
+
+
+def test_compute_portfolio_summary():
+    """Verify portfolio aggregation and leader identification."""
+    p1 = TimeSeriesDataPoint(period="2023", value=60000.0, yoy_growth=5.0)
+    p2 = TimeSeriesDataPoint(period="2023", value=90000.0, yoy_growth=12.0)
+
+    s1 = EntityMetricSeries(entity="VNM", metric="revenue", series=[p1])
+    s2 = EntityMetricSeries(entity="HPG", metric="revenue", series=[p2])
+
+    r1 = PeerRankingItem(rank=1, entity="HPG", period="2023", metric_name="revenue", metric_value=90000.0, growth_rate=12.0)
+    r2 = PeerRankingItem(rank=2, entity="VNM", period="2023", metric_name="revenue", metric_value=60000.0, growth_rate=5.0)
+
+    summary = compute_portfolio_summary([s1, s2], [r1, r2])
+    assert summary.total_entities == 2
+    assert summary.total_periods == 1
+    assert summary.portfolio_revenue_aggregate == 150000.0
+    assert summary.fastest_growing_entity == "HPG"
+

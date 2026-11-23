@@ -6,6 +6,7 @@ Enforces strict input validation, path traversal defense, and bounding box const
 
 import re
 import tempfile
+from enum import Enum
 from pathlib import Path
 from typing import List, Optional, Tuple, Literal, Dict, Any
 from pydantic import BaseModel, Field, field_validator
@@ -207,6 +208,102 @@ class ComparativeQueryResponse(BaseModel):
     retrieved_pages: Dict[str, List[int]]
     engine_used: str
     latency_ms: float
+
+
+class BenchmarkRole(str, Enum):
+    TARGET = "target"
+    PEER = "peer"
+    BENCHMARK = "benchmark"
+
+
+class PortfolioDocumentTarget(BaseModel):
+    document_id: str = Field(..., description="Unique document ID in LanceDB store")
+    entity: Optional[str] = Field(None, description="Enterprise ticker or name (e.g. VNM, HPG)")
+    period: Optional[str] = Field(None, description="Fiscal period (e.g. 2021, 2022, 2023, 2023-Q4)")
+    role: BenchmarkRole = Field(BenchmarkRole.PEER, description="Role in portfolio analysis")
+
+    @field_validator("document_id")
+    @classmethod
+    def validate_document_id(cls, v: str) -> str:
+        if not v or not re.match(r"^[a-zA-Z0-9_\-]+$", v):
+            raise ValueError(f"document_id '{v}' must be strictly alphanumeric with dashes or underscores")
+        if len(v) > 64:
+            raise ValueError(f"document_id '{v}' must not exceed 64 characters")
+        return v
+
+
+class PortfolioSynthesisRequest(BaseModel):
+    documents: List[PortfolioDocumentTarget] = Field(..., min_length=2, max_length=10, description="List of 2 to 10 document targets")
+    query_text: Optional[str] = Field(
+        "Tổng hợp hiệu quả kinh doanh, tốc độ tăng trưởng doanh thu và biên lợi nhuận giữa các kỳ báo cáo.",
+        description="Specific analytical focus query",
+    )
+    metrics_requested: List[str] = Field(
+        default_factory=lambda: [
+            "revenue", "gross_profit", "net_profit", "gross_margin", "net_margin", "cagr_revenue"
+        ],
+        description="Target financial metrics to calculate and cross-reference",
+    )
+    inference_mode: Literal["auto", "local", "cloud"] = Field("auto", description="Dual-mode inference strategy")
+
+    @field_validator("documents")
+    @classmethod
+    def validate_unique_documents(cls, docs: List[PortfolioDocumentTarget]) -> List[PortfolioDocumentTarget]:
+        if len(docs) < 2:
+            raise ValueError("documents list must contain at least 2 distinct document targets")
+        if len(docs) > 10:
+            raise ValueError("documents list must not exceed 10 document targets")
+        seen = set()
+        for d in docs:
+            if d.document_id in seen:
+                raise ValueError(f"Duplicate document_id '{d.document_id}' in portfolio request")
+            seen.add(d.document_id)
+        return docs
+
+
+class TimeSeriesDataPoint(BaseModel):
+    period: str
+    value: Optional[float] = None
+    unit: str = "VND"
+    yoy_growth: Optional[float] = None
+    evidence: Optional[GroundedEvidence] = None
+
+
+class EntityMetricSeries(BaseModel):
+    entity: str
+    metric: str
+    series: List[TimeSeriesDataPoint]
+    cagr: Optional[float] = None
+
+
+class PeerRankingItem(BaseModel):
+    rank: int
+    entity: str
+    period: str
+    metric_value: float
+    metric_name: str
+    growth_rate: Optional[float] = None
+    evidence: Optional[GroundedEvidence] = None
+
+
+class PortfolioSummary(BaseModel):
+    total_entities: int
+    total_periods: int
+    portfolio_revenue_aggregate: Optional[float] = None
+    weighted_net_margin: Optional[float] = None
+    fastest_growing_entity: Optional[str] = None
+    highest_margin_entity: Optional[str] = None
+
+
+class PortfolioSynthesisResponse(BaseModel):
+    portfolio_summary: PortfolioSummary
+    time_series_metrics: List[EntityMetricSeries]
+    peer_rankings: List[PeerRankingItem]
+    synthesis_narrative: str
+    evidences: List[GroundedEvidence]
+    retrieved_pages: Dict[str, List[int]]
+    latency_ms: float
+    engine_used: str
 
 
 

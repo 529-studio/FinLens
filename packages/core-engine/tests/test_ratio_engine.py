@@ -24,6 +24,13 @@ from contracts import (
     BoundingBox,
     GroundedEvidence,
 )
+from ratio_engine import (
+    calculate_liquidity_ratios,
+    calculate_solvency_ratios,
+    calculate_profitability_ratios,
+    calculate_dupont_3stage,
+    screen_cash_flow_health,
+)
 
 
 def test_ratio_contracts_validation_success():
@@ -118,3 +125,166 @@ def test_ratio_contracts_path_traversal_rejection():
 
     with pytest.raises(ValidationError):
         FinancialRatioRequest(document_id="doc;injection")
+
+
+def test_liquidity_ratios_calculation_and_benchmarks():
+    """Verify calculation and benchmark classification of liquidity ratios."""
+    # Current Assets: 2000, Inventories: 500, Cash: 400, Current Liabilities: 1000
+    inputs = FinancialStatementInputs(
+        current_assets=2000.0,
+        inventories=500.0,
+        cash_and_equivalents=400.0,
+        current_liabilities=1000.0,
+    )
+    ratios = calculate_liquidity_ratios(inputs)
+    ratio_dict = {r.code: r for r in ratios}
+
+    # Current ratio = 2000 / 1000 = 2.0 (OPTIMAL >= 2.0)
+    assert ratio_dict["current_ratio"].value == 2.0
+    assert ratio_dict["current_ratio"].benchmark_status == BenchmarkStatus.OPTIMAL
+
+    # Quick ratio = (2000 - 500) / 1000 = 1.5 (OPTIMAL >= 1.0)
+    assert ratio_dict["quick_ratio"].value == 1.5
+    assert ratio_dict["quick_ratio"].benchmark_status == BenchmarkStatus.OPTIMAL
+
+    # Cash ratio = 400 / 1000 = 0.4 (ADEQUATE 0.2 - 0.5)
+    assert ratio_dict["cash_ratio"].value == 0.4
+    assert ratio_dict["cash_ratio"].benchmark_status == BenchmarkStatus.ADEQUATE
+
+
+def test_solvency_and_leverage_ratios_edge_cases():
+    """Verify solvency ratios and leverage metrics."""
+    inputs = FinancialStatementInputs(
+        total_assets=10000.0,
+        total_liabilities=4000.0,
+        equity=6000.0,
+        operating_profit=1500.0,
+        interest_expense=300.0,
+    )
+    ratios = calculate_solvency_ratios(inputs)
+    ratio_dict = {r.code: r for r in ratios}
+
+    # Debt-to-Equity = 4000 / 6000 = 0.6667 (OPTIMAL <= 1.0)
+    assert ratio_dict["debt_to_equity"].value == 0.6667
+    assert ratio_dict["debt_to_equity"].benchmark_status == BenchmarkStatus.OPTIMAL
+
+    # Debt-to-Assets = 4000 / 10000 = 0.4 (OPTIMAL <= 0.5)
+    assert ratio_dict["debt_to_assets"].value == 0.4
+    assert ratio_dict["debt_to_assets"].benchmark_status == BenchmarkStatus.OPTIMAL
+
+    # Financial Leverage = 10000 / 6000 = 1.6667
+    assert ratio_dict["financial_leverage"].value == 1.6667
+
+    # Interest Coverage = 1500 / 300 = 5.0 (OPTIMAL >= 3.0)
+    assert ratio_dict["interest_coverage"].value == 5.0
+    assert ratio_dict["interest_coverage"].benchmark_status == BenchmarkStatus.OPTIMAL
+
+
+def test_profitability_and_dupont_decomposition():
+    """Verify profitability margins, ROA, ROE, and 3-stage DuPont reconciliation."""
+    # Revenue: 10000, Gross Profit: 4000, Operating Profit: 2000, Net Income: 1500
+    # Total Assets: 12000, Equity: 6000
+    inputs = FinancialStatementInputs(
+        revenue=10000.0,
+        gross_profit=4000.0,
+        operating_profit=2000.0,
+        net_income=1500.0,
+        total_assets=12000.0,
+        equity=6000.0,
+    )
+    ratios = calculate_profitability_ratios(inputs)
+    ratio_dict = {r.code: r for r in ratios}
+
+    # Gross Margin = 4000 / 10000 * 100 = 40.0%
+    assert ratio_dict["gross_margin"].value == 40.0
+    # Operating Margin = 2000 / 10000 * 100 = 20.0%
+    assert ratio_dict["operating_margin"].value == 20.0
+    # Net Margin = 1500 / 10000 * 100 = 15.0%
+    assert ratio_dict["net_margin"].value == 15.0
+    # ROA = 1500 / 12000 * 100 = 12.5%
+    assert ratio_dict["roa"].value == 12.5
+    # ROE = 1500 / 6000 * 100 = 25.0%
+    assert ratio_dict["roe"].value == 25.0
+
+    # DuPont 3-stage:
+    # Net Margin: 15.0% (0.15), Asset Turnover: 10000 / 12000 = 0.8333, Equity Multiplier: 12000 / 6000 = 2.0
+    # ROE = 15.0 * 0.8333 * 2.0 = 25.0%
+    dupont = calculate_dupont_3stage(inputs)
+    assert dupont is not None
+    assert dupont.net_profit_margin == 15.0
+    assert dupont.asset_turnover == 0.8333
+    assert dupont.equity_multiplier == 2.0
+    assert dupont.roe == 25.0
+
+
+def test_cash_flow_health_screener_grades():
+    """Verify Cash Flow Health classification across grades (STRONG, MODERATE, CAUTION, DISTRESS)."""
+    # Grade STRONG: OCF: 2000, Net Income: 1500 (EQ: 1.33 >= 1.0), Capex: 500 (FCF: 1500 > 0)
+    strong_inputs = FinancialStatementInputs(
+        net_income=1500.0,
+        operating_cash_flow=2000.0,
+        capex=500.0,
+        current_liabilities=3000.0,
+    )
+    score_strong = screen_cash_flow_health(strong_inputs)
+    assert score_strong is not None
+    assert score_strong.grade == CashFlowHealthGrade.STRONG
+    assert score_strong.free_cash_flow == 1500.0
+    assert score_strong.earnings_quality_ratio == 1.3333
+
+    # Grade CAUTION: OCF: 500, Net Income: 1500 (EQ: 0.33 < 0.5)
+    caution_inputs = FinancialStatementInputs(
+        net_income=1500.0,
+        operating_cash_flow=500.0,
+        capex=200.0,
+        current_liabilities=3000.0,
+    )
+    score_caution = screen_cash_flow_health(caution_inputs)
+    assert score_caution is not None
+    assert score_caution.grade == CashFlowHealthGrade.CAUTION
+    assert any("thấp" in w.lower() for w in score_caution.warning_signals)
+
+    # Grade DISTRESS: OCF: -500 (Negative operating cash flow)
+    distress_inputs = FinancialStatementInputs(
+        net_income=1000.0,
+        operating_cash_flow=-500.0,
+        capex=200.0,
+        current_liabilities=2000.0,
+    )
+    score_distress = screen_cash_flow_health(distress_inputs)
+    assert score_distress is not None
+    assert score_distress.grade == CashFlowHealthGrade.DISTRESS
+    assert any("âm" in w.lower() for w in score_distress.warning_signals)
+
+
+def test_zero_division_and_negative_equity_safety():
+    """Verify that division by zero and negative equity do not raise exceptions and return safe values."""
+    zero_inputs = FinancialStatementInputs(
+        revenue=0.0,
+        current_assets=1000.0,
+        current_liabilities=0.0, # Zero liability
+        equity=0.0,             # Zero equity
+        total_assets=0.0,
+        interest_expense=0.0,
+    )
+    liq = calculate_liquidity_ratios(zero_inputs)
+    assert all(r.value is None for r in liq)
+
+    solv = calculate_solvency_ratios(zero_inputs)
+    assert all(r.value is None for r in solv)
+
+    dupont = calculate_dupont_3stage(zero_inputs)
+    assert dupont is None
+
+    # Negative equity
+    neg_equity_inputs = FinancialStatementInputs(
+        total_assets=5000.0,
+        total_liabilities=7000.0,
+        equity=-2000.0, # Negative equity
+        operating_profit=500.0,
+        interest_expense=100.0,
+    )
+    solv_neg = calculate_solvency_ratios(neg_equity_inputs)
+    ratio_dict = {r.code: r for r in solv_neg}
+    assert ratio_dict["debt_to_equity"].benchmark_status == BenchmarkStatus.CRITICAL
+

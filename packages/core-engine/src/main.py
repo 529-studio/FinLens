@@ -61,12 +61,17 @@ from contracts import (
     DiscrepancyAuditResponse,
     AuditPackageRequest,
     AuditPackageResponse,
+    TenantWorkspaceCreateRequest,
+    TenantWorkspaceResponse,
+    TenantAccessVerificationRequest,
+    TenantAccessVerificationResponse,
 )
 from table_stitcher import TableStitcher
 from comparative_query import PortfolioSynthesisEngine
 from ratio_engine import FinancialRatioEngine
 from discrepancy_detector import DiscrepancyDetector
 from audit_packager import AuditPackager
+from workspace_security import WorkspaceSecurityManager
 from session_sync import AuditSessionManager
 from licensing import LicenseManager
 from auth import (
@@ -124,6 +129,7 @@ portfolio_engine = PortfolioSynthesisEngine(store=retriever.store, retriever=ret
 ratio_engine = FinancialRatioEngine(store=retriever.store, retriever=retriever, router=router)
 discrepancy_detector = DiscrepancyDetector(retriever=retriever)
 audit_packager = AuditPackager(retriever=retriever)
+workspace_manager = WorkspaceSecurityManager()
 audit_session_manager = AuditSessionManager()
 license_manager = LicenseManager()
 
@@ -922,6 +928,80 @@ async def export_audit_package_endpoint(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Regulatory audit package generation failed: {str(e)}",
         )
+
+
+@app.post("/api/v1/workspaces/create", response_model=TenantWorkspaceResponse)
+def create_workspace_endpoint(
+    req: TenantWorkspaceCreateRequest,
+    user: User = Depends(require_permission(Permission.DOC_READ)),
+):
+    """
+    Provisions an isolated multi-tenant workspace with restricted 0o700 permissions
+    and AES-256-GCM authenticated encryption at rest.
+    Enforces path traversal defense and enterprise RBAC authorization.
+    """
+    if not re.match(r"^[a-zA-Z0-9_\-]+$", req.workspace_id) or ".." in req.workspace_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Access denied: Invalid or malicious workspace_id '{req.workspace_id}' (path traversal rejected)",
+        )
+    try:
+        return workspace_manager.create_workspace(req)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to provision workspace: {str(e)}",
+        )
+
+
+@app.get("/api/v1/workspaces/{workspace_id}/status", response_model=TenantWorkspaceResponse)
+def get_workspace_status_endpoint(
+    workspace_id: str,
+    user: User = Depends(require_permission(Permission.DOC_READ)),
+):
+    """
+    Retrieves tenant workspace isolation metadata and non-reversible key fingerprint.
+    Enforces path traversal defense.
+    """
+    if not re.match(r"^[a-zA-Z0-9_\-]+$", workspace_id) or ".." in workspace_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Access denied: Invalid or malicious workspace_id '{workspace_id}'",
+        )
+    status_resp = workspace_manager.get_workspace_status(workspace_id)
+    if not status_resp:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Workspace '{workspace_id}' not found",
+        )
+    return status_resp
+
+
+@app.post("/api/v1/workspaces/{workspace_id}/verify-access", response_model=TenantAccessVerificationResponse)
+def verify_workspace_access_endpoint(
+    workspace_id: str,
+    req: TenantAccessVerificationRequest,
+    user: User = Depends(require_permission(Permission.DOC_READ)),
+):
+    """
+    Validates that a requested document resides strictly within tenant workspace boundaries.
+    Prevents cross-tenant document and vector retrieval leakage.
+    """
+    if not re.match(r"^[a-zA-Z0-9_\-]+$", workspace_id) or ".." in workspace_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Access denied: Invalid or malicious workspace_id '{workspace_id}'",
+        )
+    is_allowed = workspace_manager.verify_tenant_access(workspace_id, req.requested_document_id)
+    return TenantAccessVerificationResponse(
+        workspace_id=workspace_id,
+        requested_document_id=req.requested_document_id,
+        allowed=is_allowed,
+        reason="Access granted within tenant boundary" if is_allowed else "Cross-tenant access denied: Document is isolated to another workspace",
+    )
+
 
 
 

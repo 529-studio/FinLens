@@ -57,10 +57,13 @@ from contracts import (
     LicenseActivationRequest,
     LicenseActivationResponse,
     LicenseStatusResponse,
+    DiscrepancyAuditRequest,
+    DiscrepancyAuditResponse,
 )
 from table_stitcher import TableStitcher
 from comparative_query import PortfolioSynthesisEngine
 from ratio_engine import FinancialRatioEngine
+from discrepancy_detector import DiscrepancyDetector
 from session_sync import AuditSessionManager
 from licensing import LicenseManager
 from auth import (
@@ -116,6 +119,7 @@ cloud_router = CloudRouter()
 router = VlmRouter(mlx_engine=mlx_engine, cloud_router=cloud_router)
 portfolio_engine = PortfolioSynthesisEngine(store=retriever.store, retriever=retriever, router=router)
 ratio_engine = FinancialRatioEngine(store=retriever.store, retriever=retriever, router=router)
+discrepancy_detector = DiscrepancyDetector(retriever=retriever)
 audit_session_manager = AuditSessionManager()
 license_manager = LicenseManager()
 
@@ -840,6 +844,44 @@ async def analyze_financial_ratios_endpoint(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Financial ratio analysis failed: {str(e)}",
         )
+
+
+@app.post("/api/v1/audit/discrepancies", response_model=DiscrepancyAuditResponse)
+async def audit_discrepancies_endpoint(
+    req: DiscrepancyAuditRequest,
+    user: User = Depends(require_permission(Permission.DOC_READ)),
+):
+    """
+    Automated multi-document anomaly & discrepancy detection engine.
+    Audits cross-filing restatements, accounting equation balance identities,
+    profit & loss calculation consistency, segment consolidation gaps, and unexpected YoY variances.
+    Enforces path traversal defense and enterprise RBAC authorization.
+    """
+    for target in req.documents:
+        if not re.match(r"^[a-zA-Z0-9_\-]+$", target.document_id) or ".." in target.document_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Access denied: Invalid or malicious document_id '{target.document_id}' (path traversal rejected)",
+            )
+        pages = retriever.store.get_pages(target.document_id)
+        if not pages:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Document '{target.document_id}' not found in index. Please ingest it first.",
+            )
+
+    try:
+        return await discrepancy_detector.audit(req)
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Discrepancy audit failed: {str(e)}",
+        )
+
 
 
 

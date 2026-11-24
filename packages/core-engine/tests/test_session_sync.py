@@ -7,8 +7,12 @@ Tests presence tracking, spatial annotation broadcasting, concurrency, and secur
 import time
 import json
 import asyncio
+import sys
+from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
 from main import app
 from session_sync import AuditSessionManager, assign_user_color

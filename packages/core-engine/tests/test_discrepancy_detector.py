@@ -319,3 +319,93 @@ async def test_discrepancy_detector_full_audit_mocked():
     assert res.execution_time_ms > 0
     assert len(res.audit_narrative) > 0
 
+
+# ============================================================================
+# Task 3 Tests: REST Endpoint POST /api/v1/audit/discrepancies
+# ============================================================================
+
+from fastapi.testclient import TestClient
+from main import app
+
+client = TestClient(app)
+REPO_ROOT = Path(__file__).resolve().parents[3]
+SAMPLE_PDF = str(REPO_ROOT / "benchmarks" / "data" / "VNM_BCTC_2023_AUDITED.pdf")
+
+
+@pytest.fixture(scope="module")
+def setup_discrepancy_documents():
+    """Ingest test documents into vector store index for live endpoint test."""
+    for doc_id in ["VNM_2022_DISC", "VNM_2023_DISC"]:
+        payload = {
+            "document_id": doc_id,
+            "file_path": SAMPLE_PDF,
+            "render_dpi": 150,
+        }
+        res = client.post("/api/v1/documents/ingest", json=payload)
+        assert res.status_code == 200, f"Failed to ingest {doc_id}: {res.text}"
+
+
+def test_api_audit_discrepancies_success(setup_discrepancy_documents):
+    """Verify live endpoint POST /api/v1/audit/discrepancies returns 200 with full schema."""
+    payload = {
+        "documents": [
+            {"document_id": "VNM_2022_DISC", "entity": "VNM", "period": "2022"},
+            {"document_id": "VNM_2023_DISC", "entity": "VNM", "period": "2023"},
+        ],
+        "variance_threshold_pct": 20.0,
+        "check_restatements": True,
+        "check_accounting_equations": True,
+        "check_internal_calculations": True,
+        "check_segment_consolidation": True,
+        "tolerance_absolute": 1.0,
+    }
+    res = client.post("/api/v1/audit/discrepancies", json=payload)
+    assert res.status_code == 200, f"API failed: {res.text}"
+    data = res.json()
+
+    assert "summary" in data
+    assert data["summary"]["total_checks"] > 0
+    assert 0.0 <= data["summary"]["health_score"] <= 100.0
+    assert "discrepancies" in data
+    assert "audited_documents" in data
+    assert len(data["audited_documents"]) == 2
+    assert "audit_narrative" in data
+    assert data["execution_time_ms"] > 0
+
+
+def test_api_audit_discrepancies_path_traversal():
+    """Verify strict path traversal defense rejects malicious document identifiers."""
+    payload = {
+        "documents": [
+            {"document_id": "../../etc/passwd", "entity": "EVIL", "period": "2023"},
+        ],
+    }
+    res = client.post("/api/v1/audit/discrepancies", json=payload)
+    assert res.status_code in [400, 422]
+
+
+def test_api_audit_discrepancies_missing_document(setup_discrepancy_documents):
+    """Verify 404 is returned when a requested document target is not in the store."""
+    payload = {
+        "documents": [
+            {"document_id": "VNM_2022_DISC"},
+            {"document_id": "NOT_INGESTED_DOC_888"},
+        ],
+    }
+    res = client.post("/api/v1/audit/discrepancies", json=payload)
+    assert res.status_code == 404
+    assert "NOT_INGESTED_DOC_888" in res.json()["detail"]
+
+
+def test_api_audit_discrepancies_unauthorized():
+    """Verify missing/invalid authorization token is rejected (401)."""
+    payload = {
+        "documents": [
+            {"document_id": "VNM_2022_DISC"},
+        ],
+    }
+    headers = {"Authorization": "Bearer malformed.invalid.token"}
+    res = client.post("/api/v1/audit/discrepancies", json=payload, headers=headers)
+    assert res.status_code == 401
+
+

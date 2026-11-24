@@ -336,6 +336,17 @@
   - *Phòng thủ Path Traversal & Injection trên WebSocket:* `session_id` và `document_id` được xác thực nghiêm ngặt qua regex `^[a-zA-Z0-9_\-]{3,64}$`, từ chối ngay lập tức mọi mẫu chứa `..`, `/`, `\` bằng mã đóng WebSocket `1008 (Policy Violation)`.
   - *Khả năng phục hồi kết nối (Resilient Networking):* Phía client `useSessionSync` áp dụng thuật toán exponential backoff khi rớt mạng và gửi frame `heartbeat` định kỳ 15 giây để duy trì socket TCP qua các lớp gateway/WAF. Phía UI tuân thủ chuẩn 3 trạng thái (Skeleton, Error có nút Thử lại $\ge 48\text{px}$, Empty) và 100% Lucide React icons (Rule 15).
 
+---
+
+### Bài học 33: Kích Hoạt Bản Quyền Môi Trường Cô Lập Mạng (Air-Gapped Licensing) Bằng Chữ Ký Số Ed25519 & Dấu Vân Tay Phần Cứng Không Rò Rỉ (Zero-Leak Hardware Fingerprinting)
+- **Bối cảnh & Thách thức:** Các trung tâm dữ liệu ngân hàng và cơ quan thanh tra tài chính hoạt động trong môi trường air-gapped biệt lập, cấm tuyệt đối kết nối ra internet bên ngoài. Mô hình kích hoạt bản quyền SaaS thông thường (phone-home verification) hoàn toàn vô hiệu. Nếu lưu trữ lộ thông tin phần cứng (địa chỉ MAC hoặc số serial CPU thô), hệ thống sẽ vi phạm chính sách bảo mật Zero-Leak (Rule 2).
+- **Giải pháp chuẩn hóa (Sprint 11 - Task S11-04):**
+  - *Tạo dấu vân tay phần cứng một chiều (Irreversible Salted Hardware Fingerprint):* Kết hợp node MAC, định danh hệ điều hành (macOS `IOPlatformUUID`, Linux `/etc/machine-id`, Windows `MachineGuid`) với chuỗi salt bí mật nội bộ và băm SHA-256 (`64 hex chars`). Không bao giờ ghi log hay truyền địa chỉ MAC thô, bảo vệ quyền riêng tư và tuân thủ Zero-Leak.
+  - *Xác thực chữ ký phi đối xứng Ed25519 (Asymmetric Digital Signatures):* Payload bản quyền được chuẩn hóa dạng canonical JSON (`sort_keys=True, separators=(',', ':')`) và xác thực bằng khóa công khai Ed25519 nhúng sẵn trong engine. Khóa riêng ký (private key) chỉ nằm tại máy chủ phát hành giấy phép của vendor, loại trừ nguy cơ giải mã ngược.
+  - *Ghi đĩa nguyên tử & Phân quyền tệp an toàn (Atomic File Persistence & 0o600 Permissions):* Quá trình kích hoạt ghi tệp tạm qua `tempfile.mkstemp`, phân quyền hạn chế `0o600` (chỉ chủ sở hữu tiến trình được đọc/ghi) và hoán đổi nguyên tử `os.replace` để tránh corrupt tệp khi mất điện đột ngột.
+  - *Chuyển trạng thái linh hoạt (Multi-Tier Evaluation State Machine):* Tự động nhận diện 5 trạng thái: `ACTIVE` (hợp lệ), `EXPIRED` (hết hạn), `INVALID_SIGNATURE` (bị giả mạo/sửa đổi), `FINGERPRINT_MISMATCH` (khóa gắn với máy khác), và chuyển mượt về `COMMUNITY_EVALUATION` khi chưa cài đặt giấy phép. Hỗ trợ ký tự đại diện `*` cho các gói bản quyền dạng Floating Enterprise.
+
+
 
 
 

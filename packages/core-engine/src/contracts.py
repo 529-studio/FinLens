@@ -704,6 +704,75 @@ class CreateSessionRequest(BaseModel):
         return v
 
 
+# ============================================================================
+# Offline Air-Gapped Licensing & Hardware Fingerprinting Contracts (Task S11-04)
+# ============================================================================
+
+class LicenseTier(str, Enum):
+    """Tier level for enterprise licensing."""
+    COMMUNITY = "community"
+    PROFESSIONAL = "professional"
+    ENTERPRISE = "enterprise"
+
+
+class LicenseState(str, Enum):
+    """Current operational evaluation state of the software license."""
+    ACTIVE = "active"
+    EXPIRED = "expired"
+    INVALID_SIGNATURE = "invalid_signature"
+    FINGERPRINT_MISMATCH = "fingerprint_mismatch"
+    COMMUNITY_EVALUATION = "community_evaluation"
+
+
+class LicensePayload(BaseModel):
+    """Cryptographically signed license metadata payload."""
+    customer_id: str = Field(..., description="Unique enterprise identifier (e.g. 'VIETINBANK_HQ')")
+    customer_name: str = Field(..., description="Display name of enterprise licensee")
+    tier: LicenseTier = Field(LicenseTier.COMMUNITY, description="Licensed product tier")
+    issued_at: float = Field(..., description="Unix epoch timestamp when license was issued")
+    expires_at: float = Field(..., description="Unix epoch timestamp when license expires")
+    max_users: int = Field(10, ge=1, description="Maximum seats permitted")
+    features: List[str] = Field(default_factory=list, description="List of licensed feature flags")
+    machine_fingerprint: str = Field(
+        "*",
+        description="One-way SHA-256 machine hardware hash, or '*' for floating deployment",
+    )
+
+
+class LicenseFileDTO(BaseModel):
+    """Complete license container file with canonical payload and Ed25519 signature."""
+    payload: LicensePayload
+    signature: str = Field(..., description="Base64url-encoded Ed25519 asymmetric signature")
+
+
+class LicenseStatusResponse(BaseModel):
+    """License evaluation status report."""
+    state: LicenseState
+    is_valid: bool
+    tier: LicenseTier
+    customer_id: Optional[str] = None
+    customer_name: Optional[str] = None
+    machine_fingerprint: str
+    days_remaining: Optional[int] = None
+    max_users: int = 1
+    features: List[str] = Field(default_factory=list)
+    expires_at: Optional[float] = None
+
+
+class LicenseActivationRequest(BaseModel):
+    """Request payload to activate an air-gapped cryptographic license."""
+    license_key: Optional[str] = Field(None, description="Raw JSON or base64 string of the license file")
+    license_data: Optional[Dict[str, Any]] = Field(None, description="Optional direct structured JSON object")
+
+
+class LicenseActivationResponse(BaseModel):
+    """Response confirming license activation outcome."""
+    success: bool
+    message: str
+    status: LicenseStatusResponse
+
+
+
 
 
 

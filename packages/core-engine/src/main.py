@@ -59,11 +59,14 @@ from contracts import (
     LicenseStatusResponse,
     DiscrepancyAuditRequest,
     DiscrepancyAuditResponse,
+    AuditPackageRequest,
+    AuditPackageResponse,
 )
 from table_stitcher import TableStitcher
 from comparative_query import PortfolioSynthesisEngine
 from ratio_engine import FinancialRatioEngine
 from discrepancy_detector import DiscrepancyDetector
+from audit_packager import AuditPackager
 from session_sync import AuditSessionManager
 from licensing import LicenseManager
 from auth import (
@@ -120,6 +123,7 @@ router = VlmRouter(mlx_engine=mlx_engine, cloud_router=cloud_router)
 portfolio_engine = PortfolioSynthesisEngine(store=retriever.store, retriever=retriever, router=router)
 ratio_engine = FinancialRatioEngine(store=retriever.store, retriever=retriever, router=router)
 discrepancy_detector = DiscrepancyDetector(retriever=retriever)
+audit_packager = AuditPackager(retriever=retriever)
 audit_session_manager = AuditSessionManager()
 license_manager = LicenseManager()
 
@@ -881,6 +885,44 @@ async def audit_discrepancies_endpoint(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Discrepancy audit failed: {str(e)}",
         )
+
+
+@app.post("/api/v1/audit/export-package", response_model=AuditPackageResponse)
+async def export_audit_package_endpoint(
+    req: AuditPackageRequest,
+    user: User = Depends(require_permission(Permission.DOC_READ)),
+):
+    """
+    Automated Audit Trail Exporter & Regulatory Package Generator.
+    Produces standardized Inline XBRL (iXBRL), archival PDF/A-3 containers with embedded
+    machine-readable metadata, or full ZIP compliance bundles with SHA-256 tamper-evident event chains.
+    Enforces path traversal defense and enterprise RBAC authorization.
+    """
+    for target in req.documents:
+        if not re.match(r"^[a-zA-Z0-9_\-]+$", target.document_id) or ".." in target.document_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Access denied: Invalid or malicious document_id '{target.document_id}' (path traversal rejected)",
+            )
+        pages = retriever.store.get_pages(target.document_id)
+        if not pages:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Document '{target.document_id}' not found in index. Please ingest it first.",
+            )
+
+    try:
+        return await audit_packager.export_package(req)
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Regulatory audit package generation failed: {str(e)}",
+        )
+
 
 
 

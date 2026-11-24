@@ -840,6 +840,52 @@ class DiscrepancyAuditResponse(BaseModel):
     audit_narrative: str = Field(..., description="Concise executive audit summary of findings")
 
 
+# ============================================================================
+# Regulatory Compliance Audit Trail Packager Contracts (Task S12-02)
+# ============================================================================
+
+class RegulatoryPackageFormat(str, Enum):
+    """Supported standardized regulatory package formats."""
+    IXBRL = "ixbrl"
+    PDFA3 = "pdfa3"
+    BUNDLE = "bundle"
+
+
+class PackageManifestItem(BaseModel):
+    """Manifest entry for an individual audited filing in the regulatory package."""
+    document_id: str = Field(..., description="Target filing document identifier")
+    period: str = Field(..., description="Audited fiscal period (e.g. 2022, 2023)")
+    file_sha256: str = Field(..., description="Cryptographic SHA-256 hash of source filing")
+    grounded_citations_count: int = Field(..., ge=0, description="Count of visual grounding evidence citations")
+    discrepancies_count: int = Field(0, ge=0, description="Count of identified anomalies and restatements")
+
+
+class AuditPackageRequest(BaseModel):
+    """Request payload to generate a standardized regulatory audit compliance package."""
+    documents: List[PortfolioDocumentTarget] = Field(..., min_length=1, max_length=10, description="Filing documents to package")
+    format: RegulatoryPackageFormat = Field(RegulatoryPackageFormat.BUNDLE, description="Requested packaging format")
+    taxonomy_standard: str = Field("US-GAAP-2024", description="Regulatory taxonomy specification (e.g. US-GAAP-2024, IFRS-2024)")
+    include_discrepancy_report: bool = Field(True, description="Whether to embed discrepancy auditor findings")
+    include_grounding_manifest: bool = Field(True, description="Whether to embed spatial bounding box citation manifest")
+    auditor_notes: Optional[str] = Field(None, description="Auditor executive notes or sign-off remarks")
+
+
+class AuditPackageResponse(BaseModel):
+    """Metadata response confirming generated regulatory compliance package."""
+    package_id: str = Field(..., description="Unique compliance package identifier")
+    format: RegulatoryPackageFormat = Field(..., description="Package format generated")
+    file_name: str = Field(..., description="File name for download or transmission")
+    file_bytes_base64: str = Field(..., description="Base64-encoded binary payload of the archive or file")
+    file_size_bytes: int = Field(..., ge=0, description="Total binary size in bytes")
+    sha256_checksum: str = Field(..., description="SHA-256 integrity hash of exported payload")
+    tamper_evident_root_hash: str = Field(..., description="Cryptographic SHA-256 event chaining root hash")
+    manifest_items: List[PackageManifestItem] = Field(default_factory=list, description="List of included filing manifests")
+    total_citations: int = Field(..., ge=0, description="Total grounded citations across all filings")
+    created_at: float = Field(default_factory=time.time, description="Unix timestamp of package generation")
+    execution_time_ms: float = Field(..., ge=0.0, description="Generation latency in milliseconds")
+
+
+
 
 
 

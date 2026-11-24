@@ -8,10 +8,11 @@ import re
 import time
 import os
 import json
+import uuid
 import logging
 from typing import Optional, List, Dict, Any
 from pathlib import Path
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, status, UploadFile, File, Form, Depends
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, status, UploadFile, File, Form, Depends, Query
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 
@@ -51,10 +52,13 @@ from contracts import (
     PortfolioSynthesisResponse,
     FinancialRatioRequest,
     FinancialRatioResponse,
+    CreateSessionRequest,
+    SessionEventType,
 )
 from table_stitcher import TableStitcher
 from comparative_query import PortfolioSynthesisEngine
 from ratio_engine import FinancialRatioEngine
+from session_sync import AuditSessionManager
 from auth import (
     Role,
     Permission,
@@ -62,6 +66,8 @@ from auth import (
     LoginRequest,
     LoginResponse,
     create_access_token,
+    decode_access_token,
+    RBAC_ENABLED,
     get_current_user,
     require_permission,
     require_role,
@@ -106,6 +112,7 @@ cloud_router = CloudRouter()
 router = VlmRouter(mlx_engine=mlx_engine, cloud_router=cloud_router)
 portfolio_engine = PortfolioSynthesisEngine(store=retriever.store, retriever=retriever, router=router)
 ratio_engine = FinancialRatioEngine(store=retriever.store, retriever=retriever, router=router)
+audit_session_manager = AuditSessionManager()
 
 
 @app.get("/health")
@@ -922,6 +929,161 @@ def clear_application_cache(req: Optional[CacheClearRequest] = None, user: User 
         return res
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+# ============================================================================
+# Real-Time Collaborative Audit Session Sync Endpoints (Task S11-03)
+# ============================================================================
+
+@app.post("/api/v1/sessions")
+async def create_or_init_session(
+    req: CreateSessionRequest,
+    user: User = Depends(require_permission(Permission.DOC_READ)),
+):
+    """Initializes or retrieves an active collaborative audit session room."""
+    try:
+        session = await audit_session_manager.get_or_create_session(req.session_id, req.document_id)
+        audit_logger.log_event(
+            user_id=user.user_id,
+            role=user.role.value,
+            action="SESSION_CREATE",
+            document_id=req.document_id,
+            details={"session_id": req.session_id},
+        )
+        return {
+            "session_id": session.session_id,
+            "document_id": session.document_id,
+            "created_at": session.created_at,
+            "active_users_count": len(session.active_users),
+            "annotations_count": len(session.annotations),
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+@app.get("/api/v1/sessions/{session_id}")
+def get_session_details(
+    session_id: str,
+    user: User = Depends(require_permission(Permission.DOC_READ)),
+):
+    """Retrieves metadata, active auditors, and visual annotations for a session."""
+    try:
+        clean_sid = AuditSessionManager.validate_session_id(session_id)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+    snapshot = audit_session_manager.get_session_snapshot(clean_sid)
+    if not snapshot:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Session '{clean_sid}' not found")
+    return snapshot
+
+
+@app.websocket("/ws/v1/sessions/{session_id}")
+async def websocket_session_sync(
+    websocket: WebSocket,
+    session_id: str,
+    token: Optional[str] = Query(None),
+    document_id: Optional[str] = Query(None),
+    active_page: int = Query(1),
+):
+    """
+    Real-time WebSocket endpoint for multi-auditor presence and spatial annotation sync.
+    Enforces JWT authentication and strict session_id sanitization.
+    """
+    try:
+        clean_sid = AuditSessionManager.validate_session_id(session_id)
+    except ValueError as e:
+        await websocket.close(code=1008, reason=str(e))
+        return
+
+    # Authenticate user from query token
+    auth_user: Optional[User] = None
+    if token:
+        try:
+            auth_user = decode_access_token(token)
+        except Exception:
+            await websocket.close(code=1008, reason="Invalid authentication token")
+            return
+    elif RBAC_ENABLED:
+        await websocket.close(code=1008, reason="Authentication token required when RBAC is enabled")
+        return
+    else:
+        # Default unauthenticated auditor in development mode
+        anon_id = f"auditor_{uuid.uuid4().hex[:6]}"
+        auth_user = User(
+            user_id=anon_id,
+            role=Role.JUNIOR_ANALYST,
+            name="FinTrace Auditor",
+            permissions=set(ROLE_PERMISSIONS.get(Role.JUNIOR_ANALYST, set())),
+        )
+
+    await websocket.accept()
+
+    doc_id = document_id or "default_filing"
+    try:
+        clean_doc_id = AuditSessionManager.validate_document_id(doc_id)
+    except ValueError:
+        clean_doc_id = "default_filing"
+
+    session = await audit_session_manager.register_connection(
+        session_id=clean_sid,
+        document_id=clean_doc_id,
+        websocket=websocket,
+        user_id=auth_user.user_id,
+        name=auth_user.name,
+        role=auth_user.role.value if hasattr(auth_user.role, "value") else str(auth_user.role),
+        active_page=active_page,
+    )
+
+    # 1. Send authoritative snapshot to newly connected client
+    snapshot_payload = {
+        "event": SessionEventType.SESSION_STATE.value,
+        "session_id": clean_sid,
+        "payload": session.model_dump(),
+        "timestamp": time.time(),
+    }
+    await websocket.send_text(json.dumps(snapshot_payload))
+
+    # 2. Broadcast JOIN presence to existing peers
+    join_payload = {
+        "event": SessionEventType.JOIN.value,
+        "session_id": clean_sid,
+        "user_id": auth_user.user_id,
+        "payload": session.active_users[auth_user.user_id].model_dump(),
+        "timestamp": time.time(),
+    }
+    await audit_session_manager.broadcast(clean_sid, join_payload, exclude=websocket)
+
+    try:
+        while True:
+            raw_text = await websocket.receive_text()
+            response_or_broadcast = await audit_session_manager.handle_message(websocket, raw_text)
+            if response_or_broadcast:
+                event_type = response_or_broadcast.get("event")
+                if event_type in (SessionEventType.HEARTBEAT.value, SessionEventType.ERROR.value):
+                    await websocket.send_text(json.dumps(response_or_broadcast))
+                elif event_type in (SessionEventType.PRESENCE.value, SessionEventType.CURSOR_MOVE.value):
+                    # Do not echo presence/cursor events back to the sender
+                    await audit_session_manager.broadcast(clean_sid, response_or_broadcast, exclude=websocket)
+                else:
+                    # Broadcast collaborative events (annotations, etc.) to all clients in room
+                    await audit_session_manager.broadcast(clean_sid, response_or_broadcast)
+    except WebSocketDisconnect:
+        disc_res = await audit_session_manager.disconnect(websocket)
+        if disc_res:
+            _, disc_uid, _, user_removed = disc_res
+            if user_removed:
+                leave_payload = {
+                    "event": SessionEventType.LEAVE.value,
+                    "session_id": clean_sid,
+                    "user_id": disc_uid,
+                    "payload": {"user_id": disc_uid},
+                    "timestamp": time.time(),
+                }
+                await audit_session_manager.broadcast(clean_sid, leave_payload)
+    except Exception as e:
+        logger.error(f"Error in collaborative websocket session {clean_sid}: {e}")
+        await audit_session_manager.disconnect(websocket)
 
 
 if __name__ == "__main__":

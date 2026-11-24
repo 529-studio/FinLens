@@ -325,6 +325,18 @@
   - *Bộ sàng lọc sức khỏe dòng tiền (Cash Flow Health Screener):* Đánh giá chất lượng lợi nhuận qua hệ số $EQ = OCF / LNST$ và dòng tiền tự do $FCF = OCF - Capex$. Phân loại 4 cấp bậc cảnh báo: `STRONG`, `MODERATE`, `CAUTION` (khi FCF âm hoặc $EQ < 0.5$), và `DISTRESS` (khi dòng tiền từ hoạt động kinh doanh âm).
   - *Cơ chế Hybrid Input & Bảo toàn Visual Grounding (ADR-003):* Cho phép client truyền số liệu override thủ công để tính tức thì, hoặc tự động bóc tách từ các trang Bảng CĐKT, KQKD, LCTT trong LanceDB, đồng thời gắn kèm `GroundedEvidence` với tọa độ $[0, 1000]$ cho từng khoản mục.
 
+---
+
+### Bài học 32: Đồng Bộ Phiên Kiểm Toán Cộng Tác Thời Gian Thực (Real-Time Collaborative Audit Session Sync) Qua WebSocket An Toàn & Tránh Phản Hồi Vòng Lặp Con Trỏ (Cursor Echoing Prevention)
+- **Bối cảnh & Thách thức:** Khi nhiều kiểm toán viên cùng mở một hồ sơ BCTC trên Desktop client để phối hợp đối soát chéo (cross-examination), nhu cầu đồng bộ con trỏ, vị trí trang đang xem và các ghi chú kiểm toán (audit annotations) gắn với tọa độ tài liệu là rất lớn. Tuy nhiên, nếu broadcast con trỏ ngược lại chính người gửi (cursor echo), client sẽ bị giật rung vị trí, nghẽn hàng đợi WebSocket nhận và gây trễ các thông điệp nghiệp vụ quan trọng.
+- **Giải pháp chuẩn hóa (Sprint 11 - Task S11-03):**
+  - *Kiểm soát đồng thời bất đồng bộ (asyncio.Lock Concurrency Control):* Toàn bộ thao tác thêm/xóa kết nối client, cập nhật con trỏ, thêm/giải quyết ghi chú đều được bao bọc bởi `async with self._lock:` trong `AuditSessionManager`, loại bỏ triệt để race conditions giữa các frame WebSocket đến đồng thời.
+  - *Lọc phản hồi vòng lặp con trỏ (Selective Broadcast / Sender Exclusion):* Khi xử lý các sự kiện tần số cao như `cursor_move` và `presence`, server áp dụng `audit_session_manager.broadcast(clean_sid, payload, exclude=websocket)`. Chỉ gửi tọa độ cho các đồng nghiệp khác, không dội ngược lại người phát, vừa tiết kiệm băng thông vừa giữ trải nghiệm mượt mà.
+  - *Neo tọa độ ghi chú kiểm toán không gian (Spatial Visual Grounding):* Các ghi chú kiểm toán được gắn chặt với số trang PDF `page_number` và `bounding_box` 4 tọa độ $[ymin, xmin, ymax, xmax]$ chuẩn hóa $[0, 1000]$, hỗ trợ trạng thái `resolved` và `resolved_by` cho cấp trưởng nhóm kiểm toán.
+  - *Phòng thủ Path Traversal & Injection trên WebSocket:* `session_id` và `document_id` được xác thực nghiêm ngặt qua regex `^[a-zA-Z0-9_\-]{3,64}$`, từ chối ngay lập tức mọi mẫu chứa `..`, `/`, `\` bằng mã đóng WebSocket `1008 (Policy Violation)`.
+  - *Khả năng phục hồi kết nối (Resilient Networking):* Phía client `useSessionSync` áp dụng thuật toán exponential backoff khi rớt mạng và gửi frame `heartbeat` định kỳ 15 giây để duy trì socket TCP qua các lớp gateway/WAF. Phía UI tuân thủ chuẩn 3 trạng thái (Skeleton, Error có nút Thử lại $\ge 48\text{px}$, Empty) và 100% Lucide React icons (Rule 15).
+
+
 
 
 

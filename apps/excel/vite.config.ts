@@ -1,8 +1,12 @@
+/// <reference types="vitest" />
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
 export default defineConfig({
   plugins: [react()],
+  resolve: {
+    dedupe: ['react', 'react-dom'],
+  },
   server: {
     port: 3000,
     https: process.env.HTTPS === 'true',
@@ -23,5 +27,9 @@ export default defineConfig({
         assetFileNames: 'assets/[name]-[hash][extname]',
       },
     },
+  },
+  test: {
+    globals: true,
+    environment: 'jsdom',
   },
 });

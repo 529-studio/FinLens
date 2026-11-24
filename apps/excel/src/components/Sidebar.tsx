@@ -38,7 +38,7 @@ export const Sidebar: React.FC = () => {
     message?: string;
   }>({ status: 'idle' });
   const [isDrawerOpen, setIsDrawerOpen] = useState<boolean>(true);
-  const [selectedCellData, setSelectedCellData] = useState<AuditedCellData | null>({
+  const [selectedCellData] = useState<AuditedCellData | null>({
     cellAddress: 'Sheet1!B4',
     lineItem: 'Doanh thu thuần BCTC 2023',
     value: 60478000000000,

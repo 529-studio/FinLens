@@ -6,7 +6,6 @@
 
 import React from 'react';
 import {
-  FileText,
   ExternalLink,
   Tag,
   CheckCircle2,
@@ -15,7 +14,6 @@ import {
   BookOpen,
   X,
   Clock,
-  ChevronRight,
   ShieldCheck,
 } from 'lucide-react';
 

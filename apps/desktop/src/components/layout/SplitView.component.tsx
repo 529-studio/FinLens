@@ -13,9 +13,11 @@ import { useBridgeServer } from '../../hooks/useBridgeServer';
 import { useDaemonLifecycle } from '../../hooks/useDaemonLifecycle';
 import { ResizableSplitView } from './ResizableSplitView';
 import { BoundingBoxOverlay } from '../pdf/BoundingBoxOverlay';
+import { AnnotationCanvas } from '../pdf/AnnotationCanvas';
 import { PdfViewer } from '../pdf/PdfViewer';
 import { SettingsDialog } from '../settings/SettingsDialog';
 import { FootnoteChip } from '../chat/FootnoteChip';
+import type { AuditAnnotationDTO } from '../../types/session_sync.types';
 import {
   FileText,
   Send,
@@ -32,6 +34,7 @@ import {
   GitCompare,
   TrendingUp,
   Layers,
+  Highlighter,
 } from 'lucide-react';
 
 interface SplitViewProps {
@@ -45,6 +48,8 @@ export const SplitView: FC<SplitViewProps> = ({ documentId, documentTitle }) => 
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
   const [modeTab, setModeTab] = useState<'single' | 'comparative'>('single');
   const [selectedDocIds] = useState<string[]>(['VNM_2022_COMP', 'VNM_2023_COMP']);
+  const [isDrawingEnabled, setIsDrawingEnabled] = useState<boolean>(false);
+  const [annotations, setAnnotations] = useState<AuditAnnotationDTO[]>([]);
 
   const {
     state,
@@ -140,6 +145,21 @@ export const SplitView: FC<SplitViewProps> = ({ documentId, documentTitle }) => 
               <ZoomIn className="w-3.5 h-3.5" />
             </button>
           </div>
+
+          <button
+            type="button"
+            onClick={() => setIsDrawingEnabled((v) => !v)}
+            data-testid="toggle-annotation-mode-btn"
+            className={`min-h-[48px] px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition-colors cursor-pointer ${
+              isDrawingEnabled
+                ? 'bg-indigo-600 text-white shadow-md'
+                : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
+            }`}
+            title="Bật/Tắt chế độ ghi chú kiểm toán"
+          >
+            <Highlighter className="w-3.5 h-3.5" />
+            <span>Ghi chú</span>
+          </button>
         </div>
       </header>
 
@@ -155,6 +175,36 @@ export const SplitView: FC<SplitViewProps> = ({ documentId, documentTitle }) => 
             renderedWidth={500}
             renderedHeight={700}
             zoomLevel={zoomLevel}
+          />
+          <AnnotationCanvas
+            documentId={activeEvidence?.document_id || documentId}
+            pageNumber={activeEvidence?.page_number || 1}
+            renderedWidth={500}
+            renderedHeight={700}
+            zoomLevel={zoomLevel}
+            annotations={annotations}
+            isDrawingEnabled={isDrawingEnabled}
+            onAddAnnotation={(newAnn) => {
+              const created: AuditAnnotationDTO = {
+                ...newAnn,
+                annotation_id: `ann-${Date.now()}`,
+                created_at: Math.floor(Date.now() / 1000),
+                resolved: false,
+              };
+              setAnnotations((prev) => [...prev, created]);
+            }}
+            onResolveAnnotation={(id) => {
+              setAnnotations((prev) =>
+                prev.map((a) =>
+                  a.annotation_id === id
+                    ? { ...a, resolved: !a.resolved, resolved_by: 'Kiểm toán viên' }
+                    : a
+                )
+              );
+            }}
+            onDeleteAnnotation={(id) => {
+              setAnnotations((prev) => prev.filter((a) => a.annotation_id !== id));
+            }}
           />
         </div>
       </div>

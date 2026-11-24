@@ -5,6 +5,7 @@ Enforces strict input validation, path traversal defense, and bounding box const
 """
 
 import re
+import time
 import tempfile
 from enum import Enum
 from pathlib import Path
@@ -619,6 +620,89 @@ class TableStitchResponse(BaseModel):
     document_id: str
     table: MultiPageTableDTO
     elapsed_ms: float
+
+
+# ============================================================================
+# Real-Time Collaborative Audit Session Sync Contracts (Task S11-03)
+# ============================================================================
+
+class SessionEventType(str, Enum):
+    """Event types delivered across real-time collaborative WebSockets."""
+    JOIN = "join"
+    LEAVE = "leave"
+    PRESENCE = "presence"
+    CURSOR_MOVE = "cursor_move"
+    ANNOTATION_ADD = "annotation_add"
+    ANNOTATION_RESOLVE = "annotation_resolve"
+    ANNOTATION_DELETE = "annotation_delete"
+    HEARTBEAT = "heartbeat"
+    SESSION_STATE = "session_state"
+    ERROR = "error"
+
+
+class UserPresence(BaseModel):
+    """Real-time presence and spatial location of an auditor in a shared session."""
+    user_id: str = Field(..., description="Unique alphanumeric username or employee ID")
+    name: str = Field("FinTrace Auditor", description="Display name of the auditor")
+    role: str = Field("junior_analyst", description="Assigned organizational role")
+    color: str = Field("#4F46E5", description="Hex color assigned to auditor avatar/cursor")
+    active_page: int = Field(1, ge=1, description="PDF page number currently in view")
+    cursor_x: Optional[float] = Field(None, ge=0.0, le=1000.0, description="Normalized X coordinate [0, 1000]")
+    cursor_y: Optional[float] = Field(None, ge=0.0, le=1000.0, description="Normalized Y coordinate [0, 1000]")
+    last_seen: float = Field(default_factory=time.time, description="Unix timestamp of last activity or heartbeat")
+
+
+class AuditAnnotation(BaseModel):
+    """Spatial visual audit annotation anchored to a specific filing page and bounding box."""
+    annotation_id: str = Field(..., description="Unique UUID identifier for the annotation")
+    document_id: str = Field(..., description="Target financial filing document ID")
+    page_number: int = Field(..., ge=1, description="1-indexed PDF page number")
+    bounding_box: List[float] = Field(..., min_length=4, max_length=4, description="[ymin, xmin, ymax, xmax] coordinates in [0, 1000]")
+    comment: str = Field(..., min_length=1, description="Audit observation, review note, or question")
+    author_id: str = Field(..., description="User ID of author who created the annotation")
+    author_name: str = Field("FinTrace Auditor", description="Author display name")
+    created_at: float = Field(default_factory=time.time, description="Unix timestamp when annotation was recorded")
+    resolved: bool = Field(False, description="Whether this audit observation has been reviewed and resolved")
+    resolved_by: Optional[str] = Field(None, description="User ID of senior auditor who marked it resolved")
+
+
+class SessionState(BaseModel):
+    """Authoritative snapshot of a collaborative audit session."""
+    session_id: str = Field(..., description="Unique collaborative room ID")
+    document_id: str = Field(..., description="Target financial filing document ID")
+    created_at: float = Field(default_factory=time.time, description="Creation timestamp")
+    active_users: Dict[str, UserPresence] = Field(default_factory=dict, description="Map of active user_id to UserPresence")
+    annotations: List[AuditAnnotation] = Field(default_factory=list, description="List of spatial visual annotations")
+
+
+class CollaborativeMessage(BaseModel):
+    """WebSocket frame payload for collaborative session events."""
+    event: SessionEventType = Field(..., description="Collaborative event type")
+    session_id: str = Field(..., description="Collaborative room ID")
+    user_id: Optional[str] = Field(None, description="Originating user ID")
+    payload: Dict[str, Any] = Field(default_factory=dict, description="Event-specific data payload")
+    timestamp: float = Field(default_factory=time.time, description="Timestamp of the message")
+
+
+class CreateSessionRequest(BaseModel):
+    """Payload to create or initialize a collaborative audit session."""
+    session_id: str = Field(..., min_length=3, max_length=64, description="Alphanumeric room ID")
+    document_id: str = Field(..., min_length=1, max_length=64, description="Target document ID")
+
+    @field_validator("session_id")
+    @classmethod
+    def sanitize_session_id(cls, v: str):
+        if not re.match(r"^[a-zA-Z0-9_\-]+$", v) or ".." in v:
+            raise ValueError("Access denied: Invalid session_id format")
+        return v
+
+    @field_validator("document_id")
+    @classmethod
+    def sanitize_doc_id(cls, v: str):
+        if not re.match(r"^[a-zA-Z0-9_\-]+$", v) or ".." in v:
+            raise ValueError("Access denied: Invalid document_id format")
+        return v
+
 
 
 

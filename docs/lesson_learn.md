@@ -346,6 +346,17 @@
   - *Ghi đĩa nguyên tử & Phân quyền tệp an toàn (Atomic File Persistence & 0o600 Permissions):* Quá trình kích hoạt ghi tệp tạm qua `tempfile.mkstemp`, phân quyền hạn chế `0o600` (chỉ chủ sở hữu tiến trình được đọc/ghi) và hoán đổi nguyên tử `os.replace` để tránh corrupt tệp khi mất điện đột ngột.
   - *Chuyển trạng thái linh hoạt (Multi-Tier Evaluation State Machine):* Tự động nhận diện 5 trạng thái: `ACTIVE` (hợp lệ), `EXPIRED` (hết hạn), `INVALID_SIGNATURE` (bị giả mạo/sửa đổi), `FINGERPRINT_MISMATCH` (khóa gắn với máy khác), và chuyển mượt về `COMMUNITY_EVALUATION` khi chưa cài đặt giấy phép. Hỗ trợ ký tự đại diện `*` cho các gói bản quyền dạng Floating Enterprise.
 
+---
+
+### Bài học 34: Biểu Đồ Thác Nước So Sánh Kịch Bản (Scenario Waterfall Chart) & Kết Xuất Báo Cáo Đối Soát PDF Trên Excel Add-in
+- **Bối cảnh & Thách thức:** Trong mô hình hóa tài chính trên Excel (Office.js), chuyên viên phân tích cần trực quan hóa cầu nối biến động từ Doanh thu thuần xuống Lợi nhuận sau thuế (LNST) qua các kịch bản Cơ sở (Base), Lạc quan (Bull), và Thận trọng (Bear). Tuy nhiên, các biểu đồ dựng sẵn không liên kết được với thuyết minh BCTC và thiếu tọa độ đối soát thị giác (`[0, 1000]` BoundingBox). Ngoài ra, các thanh biến động delta lơ lửng rất dễ bị đảo chiều sai lệch nếu đầu vào truyền số âm hoặc dương không đồng nhất.
+- **Giải pháp chuẩn hóa (Sprint 11 - Task S11-05):**
+  - *Chuẩn hóa dấu biến động (Signed Delta Normalization):* Hàm `computeWaterfallSteps` chuẩn hóa rõ ràng: nếu `type === 'negative_delta'` thì luôn ép thành `-Math.abs(val)` và nếu `type === 'positive_delta'` thì ép thành `Math.abs(val)`, bất kể đầu vào người dùng truyền số âm hay dương.
+  - *Mô hình hóa kịch bản đa biến (Multi-Scenario Stress Multipliers):* Áp dụng hệ số tăng trưởng doanh thu (`revenueGrowthMultiplier`) và hệ số tối ưu chi phí (`costEfficiencyMultiplier`) cho kịch bản Bull (+10% DT, -3% CP) và Bear (-10% DT, +5% CP) kèm tự động tính tỷ lệ biến động `% vs Cơ sở`.
+  - *Kết xuất báo cáo PDF đối soát kiểm toán (Audit-Ready PDF Grounding Export):* Bộ tạo báo cáo `generateWaterfallHtmlReport` sản xuất tệp HTML/PDF độc lập, tối ưu hóa in ấn (`@media print`), bảng đối soát chi tiết từng chỉ tiêu kèm số trang PDF gốc, số hiệu thuyết minh (ví dụ TM 24, TM 25) và tọa độ BoundingBox $[ymin, xmin, ymax, xmax]$.
+  - *Ergonomics & 3 Trạng thái UI:* Áp dụng chuẩn Skeleton loading (khi đang tính toán), Error state có nút Thử lại, và Actionable Empty state có nút nạp kịch bản mẫu. Mọi nút bấm (chọn kịch bản, xuất PDF, xem thuyết minh) đều tuân thủ touch target $\ge 48\text{px}$ và 100% Lucide React SVG icons (Rule 15 Zero-Emoji).
+
+
 
 
 

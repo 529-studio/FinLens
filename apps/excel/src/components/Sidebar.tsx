@@ -6,6 +6,7 @@ import { bridge } from '../lib/bridge/client';
 import { DocumentIngestResponseDTO, ActiveDocumentState, FinancialTableData } from '../types/api';
 import { insertFinancialTableToSheet } from '../lib/excel/table-export';
 import { SensitivitySlider } from './SensitivitySlider';
+import { WaterfallChart } from './WaterfallChart';
 import {
   RefreshCw,
   Search,
@@ -336,6 +337,14 @@ export const Sidebar: React.FC = () => {
           3. Phân Tích Độ Nhạy & Kiểm Toán Công Thức
         </label>
         <SensitivitySlider />
+      </div>
+
+      {/* Scenario Waterfall & PDF Grounding Export Section */}
+      <div className="space-y-3 pt-3 border-t border-slate-200">
+        <label className="text-xs font-semibold uppercase tracking-wider text-slate-500 block">
+          4. Biểu Đồ Thác Nước & Xuất Báo Cáo Kịch Bản
+        </label>
+        <WaterfallChart />
       </div>
     </div>
   );

@@ -293,7 +293,7 @@ def test_compute_audit_health_score():
     assert compute_audit_health_score(10, 5, 0, 20) == 0.0
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_discrepancy_detector_full_audit_mocked():
     """Verify complete DiscrepancyDetector engine run across two filings."""
     detector = DiscrepancyDetector()

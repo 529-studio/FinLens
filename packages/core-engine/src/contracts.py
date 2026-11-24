@@ -885,6 +885,73 @@ class AuditPackageResponse(BaseModel):
     execution_time_ms: float = Field(..., ge=0.0, description="Generation latency in milliseconds")
 
 
+# ============================================================================
+# Multi-Tenant Enterprise Workspace Isolation Contracts (Task S12-04)
+# ============================================================================
+
+class WorkspaceTier(str, Enum):
+    """Isolation security tier for multi-tenant deployments."""
+    STANDARD = "standard"
+    ENTERPRISE_ISOLATED = "enterprise_isolated"
+    AIRGAPPED = "airgapped"
+
+
+class EncryptionAlgorithm(str, Enum):
+    """Cryptographic cipher suites supported for encryption at rest."""
+    AES_256_GCM = "aes-256-gcm"
+    CHACHA20_POLY1305 = "chacha20-poly1305"
+
+
+class TenantWorkspaceCreateRequest(BaseModel):
+    """Request payload to provision an isolated multi-tenant workspace."""
+    workspace_id: str = Field(..., max_length=64, description="Unique tenant workspace alphanumeric ID")
+    tenant_name: str = Field(..., description="Enterprise organization or department name")
+    tier: WorkspaceTier = Field(WorkspaceTier.ENTERPRISE_ISOLATED, description="Isolation boundary tier")
+    encryption_algorithm: EncryptionAlgorithm = Field(EncryptionAlgorithm.AES_256_GCM, description="Encryption cipher")
+    kms_key_id: Optional[str] = Field(None, description="Optional external KMS key ID")
+
+    @field_validator("workspace_id")
+    @classmethod
+    def sanitize_workspace_id(cls, v: str) -> str:
+        if not re.match(r"^[a-zA-Z0-9_\-]+$", v) or ".." in v or len(v) > 64:
+            raise ValueError(f"Invalid or malicious workspace_id '{v}' (path traversal rejected)")
+        return v
+
+
+class TenantWorkspaceResponse(BaseModel):
+    """Response payload confirming provisioned isolated tenant workspace."""
+    workspace_id: str
+    tenant_name: str
+    tier: WorkspaceTier
+    encryption_algorithm: EncryptionAlgorithm
+    is_encrypted: bool
+    storage_path: str
+    key_fingerprint: str
+    created_at: float
+
+
+class TenantAccessVerificationRequest(BaseModel):
+    """Request payload to verify cross-tenant access permissions."""
+    workspace_id: str = Field(..., max_length=64, description="Requesting tenant workspace ID")
+    requested_document_id: str = Field(..., description="Target filing document ID")
+
+    @field_validator("workspace_id")
+    @classmethod
+    def sanitize_workspace_id(cls, v: str) -> str:
+        if not re.match(r"^[a-zA-Z0-9_\-]+$", v) or ".." in v or len(v) > 64:
+            raise ValueError(f"Invalid or malicious workspace_id '{v}' (path traversal rejected)")
+        return v
+
+
+class TenantAccessVerificationResponse(BaseModel):
+    """Response payload confirming tenant access decision."""
+    workspace_id: str
+    requested_document_id: str
+    allowed: bool
+    reason: str
+
+
+
 
 
 

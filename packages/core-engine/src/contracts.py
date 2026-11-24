@@ -772,6 +772,75 @@ class LicenseActivationResponse(BaseModel):
     status: LicenseStatusResponse
 
 
+# ============================================================================
+# Multi-Document Anomaly & Discrepancy Detection Contracts (Task S12-01)
+# ============================================================================
+
+class DiscrepancyType(str, Enum):
+    """Classification of audited anomaly or financial discrepancy."""
+    RESTATEMENT = "restatement"
+    BALANCE_SHEET_IMBALANCE = "balance_sheet_imbalance"
+    CALCULATION_INCONSISTENCY = "calculation_inconsistency"
+    UNEXPECTED_VARIANCE = "unexpected_variance"
+    SEGMENT_CONSOLIDATION_MISMATCH = "segment_consolidation_mismatch"
+
+
+class DiscrepancySeverity(str, Enum):
+    """Audit severity ranking for identified discrepancies."""
+    CRITICAL = "critical"
+    WARNING = "warning"
+    INFO = "info"
+
+
+class DiscrepancyItem(BaseModel):
+    """Detailed record of a detected financial anomaly or cross-filing variance."""
+    id: str = Field(..., description="Unique anomaly identification slug or hash")
+    discrepancy_type: DiscrepancyType = Field(..., description="Category of discrepancy")
+    severity: DiscrepancySeverity = Field(..., description="Materiality severity level")
+    metric_name: str = Field(..., description="Affected financial statement metric or equation")
+    description: str = Field(..., description="Auditor-friendly explanation of the anomaly")
+    expected_value: Optional[float] = Field(None, description="Mathematically expected or restated base value")
+    reported_value: Optional[float] = Field(None, description="Actual reported value in the audited filing")
+    variance_absolute: Optional[float] = Field(None, description="Absolute delta magnitude (|reported - expected|)")
+    variance_percentage: Optional[float] = Field(None, description="Percentage variance delta relative to expected base")
+    period: str = Field(..., description="Fiscal period under review (e.g. 2022, 2023)")
+    source_document_id: str = Field(..., description="Document ID where reported value was retrieved")
+    comparative_document_id: Optional[str] = Field(None, description="Comparative filing document ID for cross-filing restatements")
+    evidences: List[GroundedEvidence] = Field(default_factory=list, description="Visual grounding citations anchored to PDF source")
+    resolution_hint: Optional[str] = Field(None, description="Guidance or footnote cross-reference to investigate discrepancy")
+
+
+class DiscrepancySummary(BaseModel):
+    """Aggregated scorecard of cross-filing discrepancy audit findings."""
+    total_checks: int = Field(..., ge=0, description="Total number of automated audit checks executed")
+    discrepancies_found: int = Field(..., ge=0, description="Count of anomalies detected across all severities")
+    critical_count: int = Field(..., ge=0, description="Count of critical accounting or restatement violations")
+    warning_count: int = Field(..., ge=0, description="Count of notable unexpected variances or material warnings")
+    info_count: int = Field(..., ge=0, description="Count of minor rounding or classification nuances")
+    health_score: float = Field(..., ge=0.0, le=100.0, description="Financial reporting consistency score (0 to 100)")
+
+
+class DiscrepancyAuditRequest(BaseModel):
+    """Request payload to initiate cross-filing discrepancy and anomaly detection."""
+    documents: List[PortfolioDocumentTarget] = Field(..., min_length=1, max_length=10, description="1 to 10 documents to audit")
+    variance_threshold_pct: float = Field(20.0, ge=0.0, le=1000.0, description="YoY percentage change triggering unexpected variance flag")
+    check_restatements: bool = Field(True, description="Audit prior-period comparative figures across consecutive filings")
+    check_accounting_equations: bool = Field(True, description="Verify fundamental accounting balance identities")
+    check_internal_calculations: bool = Field(True, description="Verify subtotal and profit calculation consistency")
+    check_segment_consolidation: bool = Field(True, description="Verify segment summation against consolidated financial statements")
+    tolerance_absolute: float = Field(1.0, ge=0.0, description="Absolute tolerance for rounding differences")
+
+
+class DiscrepancyAuditResponse(BaseModel):
+    """Comprehensive response containing detected anomalies, severity summary, and grounding."""
+    summary: DiscrepancySummary = Field(..., description="Summary scorecard of audit results")
+    discrepancies: List[DiscrepancyItem] = Field(default_factory=list, description="Detailed list of identified discrepancies")
+    audited_documents: List[str] = Field(default_factory=list, description="List of audited document IDs")
+    execution_time_ms: float = Field(..., ge=0.0, description="Engine execution latency in milliseconds")
+    audit_narrative: str = Field(..., description="Concise executive audit summary of findings")
+
+
+
 
 
 

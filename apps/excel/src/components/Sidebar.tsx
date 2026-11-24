@@ -7,6 +7,7 @@ import { DocumentIngestResponseDTO, ActiveDocumentState, FinancialTableData } fr
 import { insertFinancialTableToSheet } from '../lib/excel/table-export';
 import { SensitivitySlider } from './SensitivitySlider';
 import { WaterfallChart } from './WaterfallChart';
+import { AuditedCellDrawer, type AuditedCellData } from './AuditedCellDrawer';
 import {
   RefreshCw,
   Search,
@@ -19,6 +20,7 @@ import {
   Sparkles,
   FileSpreadsheet,
   ArrowDownToLine,
+  Tag,
 } from 'lucide-react';
 
 export const Sidebar: React.FC = () => {
@@ -35,6 +37,21 @@ export const Sidebar: React.FC = () => {
     status: 'idle' | 'exporting' | 'success' | 'error';
     message?: string;
   }>({ status: 'idle' });
+  const [isDrawerOpen, setIsDrawerOpen] = useState<boolean>(true);
+  const [selectedCellData] = useState<AuditedCellData | null>({
+    cellAddress: 'Sheet1!B4',
+    lineItem: 'Doanh thu thuần BCTC 2023',
+    value: 60478000000000,
+    formattedValue: '60,478 tỷ VNĐ',
+    auditStatus: 'verified',
+    footnoteNumber: 'VI.24',
+    footnoteTitle: 'Doanh thu theo bộ phận địa lý',
+    footnoteSummary: 'Ghi nhận doanh thu thuần nội địa 50,617 tỷ và xuất khẩu 9,861 tỷ.',
+    documentId: 'VNM_2023_AUDITED',
+    pageNumber: 32,
+    boundingBox: [150, 100, 320, 900],
+    confidence: 0.99,
+  });
 
   const {
     data: queryResult,
@@ -345,6 +362,36 @@ export const Sidebar: React.FC = () => {
           4. Biểu Đồ Thác Nước & Xuất Báo Cáo Kịch Bản
         </label>
         <WaterfallChart />
+      </div>
+
+      {/* Live Linked Footnote Citation Drawer & In-Sheet Audited Cell Tags Section */}
+      <div className="space-y-3 pt-3 border-t border-slate-200">
+        <div className="flex items-center justify-between">
+          <label className="text-xs font-semibold uppercase tracking-wider text-slate-500 block">
+            5. Thuyết Minh Liên Kết & Thẻ Kiểm Toán Ô
+          </label>
+          <button
+            type="button"
+            data-testid="toggle-audited-drawer-btn"
+            onClick={() => setIsDrawerOpen((v) => !v)}
+            className="min-h-[48px] px-3 py-1.5 text-xs text-indigo-600 hover:text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-lg font-medium flex items-center space-x-1 transition-colors cursor-pointer"
+          >
+            <Tag className="w-3.5 h-3.5" />
+            <span>{isDrawerOpen ? 'Đóng thẻ' : 'Mở thẻ ô'}</span>
+          </button>
+        </div>
+
+        <AuditedCellDrawer
+          isOpen={isDrawerOpen}
+          cellData={selectedCellData}
+          onClose={() => setIsDrawerOpen(false)}
+          onJumpToPdf={(docId, page) => {
+            bridge.sendCitation(`${docId}:page${page}`);
+          }}
+          onInsertAuditNote={(cell) => {
+            console.log('Inserting cell note:', cell.cellAddress);
+          }}
+        />
       </div>
     </div>
   );

@@ -306,6 +306,116 @@ class PortfolioSynthesisResponse(BaseModel):
     engine_used: str
 
 
+class FinancialStatementInputs(BaseModel):
+    """Raw financial statement line items (in reporting currency / VND)."""
+    # Income Statement
+    revenue: Optional[float] = Field(None, description="Doanh thu thuần")
+    gross_profit: Optional[float] = Field(None, description="Lợi nhuận gộp")
+    operating_profit: Optional[float] = Field(None, description="Lợi nhuận từ HĐKD (EBIT)")
+    net_income: Optional[float] = Field(None, description="Lợi nhuận sau thuế (LNST)")
+    interest_expense: Optional[float] = Field(None, description="Chi phí lãi vay")
+
+    # Balance Sheet
+    current_assets: Optional[float] = Field(None, description="Tài sản ngắn hạn")
+    cash_and_equivalents: Optional[float] = Field(None, description="Tiền và tương đương tiền")
+    inventories: Optional[float] = Field(None, description="Hàng tồn kho")
+    total_assets: Optional[float] = Field(None, description="Tổng tài sản")
+    current_liabilities: Optional[float] = Field(None, description="Nợ ngắn hạn")
+    total_liabilities: Optional[float] = Field(None, description="Tổng nợ phải trả")
+    equity: Optional[float] = Field(None, description="Vốn chủ sở hữu")
+
+    # Cash Flow Statement
+    operating_cash_flow: Optional[float] = Field(None, description="Lưu chuyển tiền thuần từ HĐKD (OCF)")
+    capex: Optional[float] = Field(None, description="Tiền chi mua sắm TSCĐ (Capital Expenditures)")
+
+
+class FinancialRatioRequest(BaseModel):
+    document_id: str = Field(..., description="Unique document ID in LanceDB store")
+    raw_inputs_override: Optional[FinancialStatementInputs] = Field(
+        None, description="Optional manual overrides for financial line items"
+    )
+    include_dupont: bool = Field(True, description="Compute 3-stage DuPont decomposition")
+    include_cash_flow_screening: bool = Field(True, description="Execute cash flow health screener")
+    inference_mode: Literal["auto", "local", "cloud"] = Field("auto", description="Dual-mode inference strategy")
+
+    @field_validator("document_id")
+    @classmethod
+    def validate_document_id(cls, v: str) -> str:
+        if not v or not re.match(r"^[a-zA-Z0-9_\-]+$", v):
+            raise ValueError(f"document_id '{v}' must be strictly alphanumeric with dashes or underscores")
+        if len(v) > 64:
+            raise ValueError(f"document_id '{v}' must not exceed 64 characters")
+        return v
+
+
+class RatioCategory(str, Enum):
+    LIQUIDITY = "liquidity"
+    SOLVENCY = "solvency"
+    PROFITABILITY = "profitability"
+    EFFICIENCY = "efficiency"
+
+
+class BenchmarkStatus(str, Enum):
+    OPTIMAL = "optimal"
+    ADEQUATE = "adequate"
+    WARNING = "warning"
+    CRITICAL = "critical"
+    NOT_APPLICABLE = "not_applicable"
+
+
+class RatioItem(BaseModel):
+    code: str = Field(..., description="Machine-readable ratio code e.g. current_ratio")
+    name: str = Field(..., description="Human-readable name in Vietnamese / English")
+    category: RatioCategory
+    value: Optional[float] = None
+    unit: str = "x"
+    benchmark_status: BenchmarkStatus = BenchmarkStatus.NOT_APPLICABLE
+    formula_description: str
+    evidences: List[GroundedEvidence] = Field(default_factory=list)
+
+
+class RatioCategoryGroup(BaseModel):
+    category: RatioCategory
+    ratios: List[RatioItem]
+
+
+class DuPontAnalysis(BaseModel):
+    net_profit_margin: Optional[float] = Field(None, description="Net Income / Revenue (%)")
+    asset_turnover: Optional[float] = Field(None, description="Revenue / Total Assets (x)")
+    equity_multiplier: Optional[float] = Field(None, description="Total Assets / Equity (x)")
+    roe: Optional[float] = Field(None, description="Return on Equity (%)")
+    formula_narrative: str
+    evidences: List[GroundedEvidence] = Field(default_factory=list)
+
+
+class CashFlowHealthGrade(str, Enum):
+    STRONG = "STRONG"
+    MODERATE = "MODERATE"
+    CAUTION = "CAUTION"
+    DISTRESS = "DISTRESS"
+
+
+class CashFlowHealthScore(BaseModel):
+    grade: CashFlowHealthGrade
+    earnings_quality_ratio: Optional[float] = Field(None, description="OCF / Net Income")
+    free_cash_flow: Optional[float] = Field(None, description="OCF - Capex (VND)")
+    ocf_to_current_debt: Optional[float] = Field(None, description="OCF / Current Liabilities")
+    health_summary: str
+    warning_signals: List[str] = Field(default_factory=list)
+    evidences: List[GroundedEvidence] = Field(default_factory=list)
+
+
+class FinancialRatioResponse(BaseModel):
+    document_id: str
+    ratio_groups: List[RatioCategoryGroup]
+    dupont_analysis: Optional[DuPontAnalysis] = None
+    cash_flow_health: Optional[CashFlowHealthScore] = None
+    raw_inputs_used: FinancialStatementInputs
+    evidences: List[GroundedEvidence]
+    latency_ms: float
+    engine_used: str
+
+
 
 class CacheStatsResponse(BaseModel):
     """Cache performance statistics for local rendering and in-memory queries."""

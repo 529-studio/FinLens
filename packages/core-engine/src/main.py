@@ -49,9 +49,12 @@ from contracts import (
     TableStitchResponse,
     PortfolioSynthesisRequest,
     PortfolioSynthesisResponse,
+    FinancialRatioRequest,
+    FinancialRatioResponse,
 )
 from table_stitcher import TableStitcher
 from comparative_query import PortfolioSynthesisEngine
+from ratio_engine import FinancialRatioEngine
 from auth import (
     Role,
     Permission,
@@ -102,6 +105,7 @@ mlx_engine = MLXEngine(model_manager=model_manager)
 cloud_router = CloudRouter()
 router = VlmRouter(mlx_engine=mlx_engine, cloud_router=cloud_router)
 portfolio_engine = PortfolioSynthesisEngine(store=retriever.store, retriever=retriever, router=router)
+ratio_engine = FinancialRatioEngine(store=retriever.store, retriever=retriever, router=router)
 
 
 @app.get("/health")
@@ -789,6 +793,40 @@ async def synthesize_portfolio_endpoint(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Portfolio synthesis failed: {str(e)}",
+        )
+
+
+@app.post("/api/v1/analysis/ratios", response_model=FinancialRatioResponse)
+async def analyze_financial_ratios_endpoint(
+    req: FinancialRatioRequest,
+    user: User = Depends(require_permission(Permission.DOC_READ)),
+):
+    """
+    Computes 14 standard financial ratios, 3-stage DuPont decomposition, and cash flow health grading.
+    Enforces path traversal defense and enterprise RBAC authorization.
+    """
+    if not re.match(r"^[a-zA-Z0-9_\-]+$", req.document_id) or ".." in req.document_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Access denied: Invalid or malicious document_id '{req.document_id}' (path traversal rejected)",
+        )
+    pages = retriever.store.get_pages(req.document_id)
+    if not pages:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Document '{req.document_id}' not found in index. Please ingest it first.",
+        )
+
+    try:
+        return await ratio_engine.analyze(req)
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Financial ratio analysis failed: {str(e)}",
         )
 
 

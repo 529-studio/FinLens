@@ -315,6 +315,17 @@
   - *Bảo toàn 100% Visual Grounding (ADR-003):* Mỗi điểm dữ liệu chuỗi thời gian đều giữ nguyên đối tượng `GroundedEvidence` gốc kèm `document_id`, `page_number` và `bounding_box` $[ymin, xmin, ymax, xmax]$ tỷ lệ $[0, 1000]$ phục vụ nhấp chuyển trang trên PDF viewer.
   - *Phòng thủ Path Traversal & Giới hạn tài nguyên:* Mọi `document_id` đều được kiểm tra chặt chẽ bằng regex `^[a-zA-Z0-9_\-]+$`, giới hạn tối đa 10 tài liệu/request để giữ trần bộ nhớ Apple Silicon Metal $< 6.0\text{ GB}$.
 
+---
+
+### Bài học 31: Động Cơ Tính Toán Chỉ Số Tài Chính Tự Động, Phân Rã DuPont 3 Nhân Tố & Sàng Lọc Sức Khỏe Dòng Tiền (Cash Flow Health Screener)
+- **Bối cảnh & Thách thức:** Trong kiểm toán BCTC và thẩm định tín dụng, việc tính toán thủ công các hệ số tài chính thường gặp 3 vấn đề lớn: rủi ro chia cho 0 khi nợ ngắn hạn hoặc vốn chủ sở hữu bằng 0, không phát hiện được "lợi nhuận trên giấy" (lợi nhuận kế toán cao nhưng dòng tiền kinh doanh âm), và sự thiếu vắng liên kết đối soát ngược về tọa độ gốc của con số trên báo cáo PDF.
+- **Giải pháp chuẩn hóa (Sprint 11 - Task S11-02):**
+  - *Bộ tính toán xác định an toàn phép chia (Safe Division & IEEE-754 Normalization):* Hàm `safe_divide` kiểm soát chặt chẽ mẫu số (trả về `None` khi mẫu số $= 0$ hoặc `None`), chủ động cảnh báo `CRITICAL` khi vốn chủ sở hữu âm ($VCSH \le 0$) mà không gây sập ứng dụng. Toàn bộ phép tính được chuẩn hóa làm tròn `round((val + 1e-9), precision)`.
+  - *Mô hình phân rã DuPont 3 nhân tố:* Khớp nối chính xác giữa Biên lợi nhuận ròng, Vòng quay tài sản và Đòn bẩy tài chính ($\text{ROE} = \text{Net Margin} \times \text{Asset Turnover} \times \text{Financial Leverage}$) kèm câu diễn giải chuẩn hóa.
+  - *Bộ sàng lọc sức khỏe dòng tiền (Cash Flow Health Screener):* Đánh giá chất lượng lợi nhuận qua hệ số $EQ = OCF / LNST$ và dòng tiền tự do $FCF = OCF - Capex$. Phân loại 4 cấp bậc cảnh báo: `STRONG`, `MODERATE`, `CAUTION` (khi FCF âm hoặc $EQ < 0.5$), và `DISTRESS` (khi dòng tiền từ hoạt động kinh doanh âm).
+  - *Cơ chế Hybrid Input & Bảo toàn Visual Grounding (ADR-003):* Cho phép client truyền số liệu override thủ công để tính tức thì, hoặc tự động bóc tách từ các trang Bảng CĐKT, KQKD, LCTT trong LanceDB, đồng thời gắn kèm `GroundedEvidence` với tọa độ $[0, 1000]$ cho từng khoản mục.
+
+
 
 
 

@@ -30,6 +30,7 @@ from ratio_engine import (
     calculate_profitability_ratios,
     calculate_dupont_3stage,
     screen_cash_flow_health,
+    FinancialRatioEngine,
 )
 
 
@@ -287,4 +288,119 @@ def test_zero_division_and_negative_equity_safety():
     solv_neg = calculate_solvency_ratios(neg_equity_inputs)
     ratio_dict = {r.code: r for r in solv_neg}
     assert ratio_dict["debt_to_equity"].benchmark_status == BenchmarkStatus.CRITICAL
+
+
+@pytest.mark.anyio
+async def test_engine_analyze_missing_document_raises_404():
+    """Verify that analyzing an unindexed document raises FileNotFoundError."""
+    from unittest.mock import MagicMock
+
+    store = MagicMock()
+    store.get_pages.return_value = []
+    retriever = MagicMock()
+    router = MagicMock()
+
+    engine = FinancialRatioEngine(store=store, retriever=retriever, router=router)
+    req = FinancialRatioRequest(document_id="NON_EXISTENT_DOC")
+    with pytest.raises(FileNotFoundError) as exc_info:
+        await engine.analyze(req)
+    assert "NON_EXISTENT_DOC" in str(exc_info.value)
+
+
+@pytest.mark.anyio
+async def test_engine_analyze_with_override_inputs():
+    """Verify analysis using explicit inputs override without calling router."""
+    from unittest.mock import MagicMock
+
+    store = MagicMock()
+    store.get_pages.return_value = [{"page_number": 1, "image_path": "/tmp/1.png"}]
+    retriever = MagicMock()
+    router = MagicMock()
+
+    engine = FinancialRatioEngine(store=store, retriever=retriever, router=router)
+    inputs = FinancialStatementInputs(
+        revenue=50000.0,
+        gross_profit=20000.0,
+        operating_profit=10000.0,
+        net_income=8000.0,
+        interest_expense=500.0,
+        current_assets=25000.0,
+        cash_and_equivalents=8000.0,
+        inventories=4000.0,
+        total_assets=45000.0,
+        current_liabilities=15000.0,
+        total_liabilities=20000.0,
+        equity=25000.0,
+        operating_cash_flow=9000.0,
+        capex=1500.0,
+    )
+    req = FinancialRatioRequest(
+        document_id="VNM_2023",
+        raw_inputs_override=inputs,
+        include_dupont=True,
+        include_cash_flow_screening=True,
+    )
+    res = await engine.analyze(req)
+    assert res.document_id == "VNM_2023"
+    assert len(res.ratio_groups) == 3
+    assert res.dupont_analysis is not None
+    assert res.dupont_analysis.roe == 32.0
+    assert res.cash_flow_health is not None
+    assert res.cash_flow_health.grade == CashFlowHealthGrade.STRONG
+    assert res.latency_ms > 0
+    # Router should not be invoked when override is provided
+    router.analyze_page.assert_not_called()
+
+
+@pytest.mark.anyio
+async def test_engine_analyze_automated_extraction_mocked():
+    """Verify automated line item extraction from document pages and ratio computation."""
+    from unittest.mock import MagicMock, AsyncMock
+
+    store = MagicMock()
+    store.get_pages.return_value = [
+        {"page_number": 1, "image_path": "/tmp/vnm_p1.png"},
+        {"page_number": 2, "image_path": "/tmp/vnm_p2.png"},
+    ]
+    retriever = MagicMock()
+    retriever.search.return_value = [1, 2]
+
+    mock_vlm_output = {
+        "engine": "mock-vlm",
+        "answer": "Báo cáo tài chính năm 2023",
+        "extracted_items": {
+            "revenue": 60478.0,
+            "gross_profit": 24614.0,
+            "net_income": 9019.0,
+            "current_assets": 35000.0,
+            "current_liabilities": 18000.0,
+            "operating_cash_flow": 10500.0,
+        },
+        "evidences": [
+            {
+                "page_number": 1,
+                "ymin": 200,
+                "xmin": 100,
+                "ymax": 250,
+                "xmax": 900,
+                "label": "Doanh thu thuần",
+                "extracted_value": "60,478 tỷ",
+                "confidence": 0.98,
+                "document_id": "VNM_2023_AUDITED",
+            }
+        ],
+    }
+    router = MagicMock()
+    router.analyze_page = AsyncMock(return_value=mock_vlm_output)
+
+    engine = FinancialRatioEngine(store=store, retriever=retriever, router=router)
+    req = FinancialRatioRequest(document_id="VNM_2023_AUDITED")
+    res = await engine.analyze(req)
+
+    assert res.document_id == "VNM_2023_AUDITED"
+    assert res.raw_inputs_used.revenue == 60478.0
+    assert len(res.evidences) >= 1
+    assert res.evidences[0].document_id == "VNM_2023_AUDITED"
+    assert 0 <= res.evidences[0].bounding_box.ymin < res.evidences[0].bounding_box.ymax <= 1000
+
 

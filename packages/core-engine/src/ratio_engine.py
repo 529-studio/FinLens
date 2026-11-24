@@ -427,3 +427,145 @@ def screen_cash_flow_health(
         warning_signals=warnings,
         evidences=[e for k, e in evidences_map.items() if k in ["operating_cash_flow", "capex", "net_income"]],
     )
+
+
+class FinancialRatioEngine:
+    """
+    Decoupled domain coordinator for financial ratio calculation and cash flow health screening.
+    Supports explicit input overrides or automated visual extraction from stored filings.
+    """
+
+    def __init__(self, store: Any, retriever: Any, router: Any):
+        self.store = store
+        self.retriever = retriever
+        self.router = router
+
+    async def analyze(self, req: FinancialRatioRequest) -> FinancialRatioResponse:
+        start_time = time.time()
+
+        # 1. Verify document exists in store
+        pages = self.store.get_pages(req.document_id)
+        if not pages:
+            raise FileNotFoundError(f"Document '{req.document_id}' not found in index. Please ingest it first.")
+
+        evidences_map: Dict[str, GroundedEvidence] = {}
+        all_evidences: List[GroundedEvidence] = []
+        engine_used = "deterministic-formula-engine"
+
+        # 2. Obtain inputs (either explicit override or automated extraction)
+        if req.raw_inputs_override is not None:
+            inputs = req.raw_inputs_override
+        else:
+            inputs, extracted_evidences = await self._extract_line_items_from_document(
+                req.document_id, mode=req.inference_mode
+            )
+            evidences_map = extracted_evidences
+            all_evidences.extend(extracted_evidences.values())
+            engine_used = "hybrid-vlm-ratio-engine"
+
+        # 3. Calculate ratio groups
+        liq_ratios = calculate_liquidity_ratios(inputs, evidences_map)
+        solv_ratios = calculate_solvency_ratios(inputs, evidences_map)
+        prof_ratios = calculate_profitability_ratios(inputs, evidences_map)
+
+        ratio_groups = [
+            RatioCategoryGroup(category=RatioCategory.LIQUIDITY, ratios=liq_ratios),
+            RatioCategoryGroup(category=RatioCategory.SOLVENCY, ratios=solv_ratios),
+            RatioCategoryGroup(category=RatioCategory.PROFITABILITY, ratios=prof_ratios),
+        ]
+
+        # 4. DuPont 3-stage decomposition
+        dupont = None
+        if req.include_dupont:
+            dupont = calculate_dupont_3stage(inputs, evidences_map)
+
+        # 5. Cash Flow Health Screener
+        cf_health = None
+        if req.include_cash_flow_screening:
+            cf_health = screen_cash_flow_health(inputs, evidences_map)
+
+        duration_ms = (time.time() - start_time) * 1000.0
+
+        return FinancialRatioResponse(
+            document_id=req.document_id,
+            ratio_groups=ratio_groups,
+            dupont_analysis=dupont,
+            cash_flow_health=cf_health,
+            raw_inputs_used=inputs,
+            evidences=all_evidences,
+            latency_ms=round(duration_ms, 2),
+            engine_used=engine_used,
+        )
+
+    async def _extract_line_items_from_document(
+        self, document_id: str, mode: str
+    ) -> Tuple[FinancialStatementInputs, Dict[str, GroundedEvidence]]:
+        """
+        Coordinates visual retrieval and VLM extraction to parse statement line items.
+        """
+        candidate_pages = self.retriever.search(
+            document_id,
+            "Bảng cân đối kế toán kết quả hoạt động kinh doanh lưu chuyển tiền tệ",
+            top_k=3,
+        )
+        if not candidate_pages:
+            candidate_pages = [1]
+
+        stored_pages = self.store.get_pages(document_id)
+        page_dict = {p["page_number"]: p["image_path"] for p in stored_pages}
+
+        extracted_data: Dict[str, Any] = {}
+        evidences_map: Dict[str, GroundedEvidence] = {}
+
+        for p_num in candidate_pages:
+            img_path = page_dict.get(p_num)
+            if not img_path:
+                continue
+
+            query = (
+                "Bóc tách các chỉ số tài chính chính: Doanh thu thuần (revenue), "
+                "Lợi nhuận gộp (gross_profit), Lợi nhuận sau thuế (net_income), "
+                "Tài sản ngắn hạn (current_assets), Hàng tồn kho (inventories), "
+                "Tiền và tương đương tiền (cash_and_equivalents), Tổng tài sản (total_assets), "
+                "Nợ ngắn hạn (current_liabilities), Tổng nợ (total_liabilities), Vốn chủ sở hữu (equity), "
+                "Dòng tiền thuần từ HĐKD (operating_cash_flow), Chi mua sắm TSCĐ (capex)."
+            )
+
+            res = await self.router.analyze_page(
+                image_path=img_path,
+                query=query,
+                page_number=p_num,
+                preferred_mode=mode,
+            )
+
+            if "extracted_items" in res and isinstance(res["extracted_items"], dict):
+                for k, v in res["extracted_items"].items():
+                    if k not in extracted_data and v is not None:
+                        try:
+                            extracted_data[k] = float(v)
+                        except (ValueError, TypeError):
+                            pass
+
+            for ev in res.get("evidences", []):
+                ev_obj = GroundedEvidence(
+                    page_number=ev.get("page_number", p_num),
+                    bounding_box=BoundingBox(
+                        ymin=ev["ymin"],
+                        xmin=ev["xmin"],
+                        ymax=ev["ymax"],
+                        xmax=ev["xmax"],
+                    ),
+                    label=ev.get("label", "Chỉ số tài chính"),
+                    extracted_value=ev.get("extracted_value"),
+                    confidence=ev.get("confidence", 0.95),
+                    document_id=document_id,
+                )
+                lbl = ev_obj.label.lower()
+                for key in ["revenue", "gross_profit", "net_income", "current_assets", "current_liabilities", "equity", "operating_cash_flow", "capex"]:
+                    if key in lbl or key in extracted_data:
+                        evidences_map[key] = ev_obj
+
+        valid_fields = FinancialStatementInputs.model_fields.keys()
+        inputs = FinancialStatementInputs(**{k: v for k, v in extracted_data.items() if k in valid_fields})
+        return inputs, evidences_map
+

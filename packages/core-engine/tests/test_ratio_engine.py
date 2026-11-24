@@ -32,6 +32,12 @@ from ratio_engine import (
     screen_cash_flow_health,
     FinancialRatioEngine,
 )
+from fastapi.testclient import TestClient
+from main import app
+
+client = TestClient(app)
+REPO_ROOT = Path(__file__).resolve().parents[3]
+SAMPLE_PDF = str(REPO_ROOT / "benchmarks" / "data" / "VNM_BCTC_2023_AUDITED.pdf")
 
 
 def test_ratio_contracts_validation_success():
@@ -402,5 +408,83 @@ async def test_engine_analyze_automated_extraction_mocked():
     assert len(res.evidences) >= 1
     assert res.evidences[0].document_id == "VNM_2023_AUDITED"
     assert 0 <= res.evidences[0].bounding_box.ymin < res.evidences[0].bounding_box.ymax <= 1000
+
+
+@pytest.fixture(scope="module")
+def setup_test_documents():
+    """Ensure setup document is ingested in LanceDB store for API integration testing."""
+    payload = {
+        "file_path": SAMPLE_PDF,
+        "document_id": "VNM_2023_RATIO",
+        "render_dpi": 150,
+    }
+    res = client.post("/api/v1/documents/ingest", json=payload)
+    assert res.status_code == 200, f"Failed to ingest setup document: {res.text}"
+
+
+def test_api_ratios_endpoint_with_override_success(setup_test_documents):
+    """Verify live API endpoint POST /api/v1/analysis/ratios returns 200 and complete schema with override inputs."""
+    payload = {
+        "document_id": "VNM_2023_RATIO",
+        "raw_inputs_override": {
+            "revenue": 60478.0,
+            "gross_profit": 24614.0,
+            "operating_profit": 11200.0,
+            "net_income": 9019.0,
+            "interest_expense": 350.0,
+            "current_assets": 35000.0,
+            "cash_and_equivalents": 12000.0,
+            "inventories": 5500.0,
+            "total_assets": 52000.0,
+            "current_liabilities": 18000.0,
+            "total_liabilities": 21000.0,
+            "equity": 31000.0,
+            "operating_cash_flow": 10500.0,
+            "capex": 2000.0,
+        },
+        "include_dupont": True,
+        "include_cash_flow_screening": True,
+    }
+    res = client.post("/api/v1/analysis/ratios", json=payload)
+    assert res.status_code == 200, f"API endpoint failed: {res.text}"
+    data = res.json()
+
+    assert data["document_id"] == "VNM_2023_RATIO"
+    assert len(data["ratio_groups"]) == 3
+    assert data["dupont_analysis"] is not None
+    assert data["dupont_analysis"]["roe"] > 0
+    assert data["cash_flow_health"] is not None
+    assert data["cash_flow_health"]["grade"] == "STRONG"
+    assert data["latency_ms"] > 0
+
+
+def test_api_ratios_endpoint_path_traversal():
+    """Verify path traversal attack is blocked on POST /api/v1/analysis/ratios."""
+    payload = {
+        "document_id": "../../etc/passwd",
+    }
+    res = client.post("/api/v1/analysis/ratios", json=payload)
+    assert res.status_code in [400, 422], f"Expected 400 or 422, got {res.status_code}"
+
+
+def test_api_ratios_endpoint_missing_document(setup_test_documents):
+    """Verify missing document returns 404."""
+    payload = {
+        "document_id": "NON_EXISTENT_DOC_999",
+    }
+    res = client.post("/api/v1/analysis/ratios", json=payload)
+    assert res.status_code == 404
+    assert "NON_EXISTENT_DOC_999" in res.json()["detail"]
+
+
+def test_api_ratios_endpoint_unauthorized():
+    """Verify invalid JWT returns 401 Unauthorized."""
+    payload = {
+        "document_id": "VNM_2023_RATIO",
+    }
+    headers = {"Authorization": "Bearer invalid.malformed.jwt"}
+    res = client.post("/api/v1/analysis/ratios", json=payload, headers=headers)
+    assert res.status_code == 401
+
 
 

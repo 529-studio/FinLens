@@ -54,11 +54,15 @@ from contracts import (
     FinancialRatioResponse,
     CreateSessionRequest,
     SessionEventType,
+    LicenseActivationRequest,
+    LicenseActivationResponse,
+    LicenseStatusResponse,
 )
 from table_stitcher import TableStitcher
 from comparative_query import PortfolioSynthesisEngine
 from ratio_engine import FinancialRatioEngine
 from session_sync import AuditSessionManager
+from licensing import LicenseManager
 from auth import (
     Role,
     Permission,
@@ -113,6 +117,7 @@ router = VlmRouter(mlx_engine=mlx_engine, cloud_router=cloud_router)
 portfolio_engine = PortfolioSynthesisEngine(store=retriever.store, retriever=retriever, router=router)
 ratio_engine = FinancialRatioEngine(store=retriever.store, retriever=retriever, router=router)
 audit_session_manager = AuditSessionManager()
+license_manager = LicenseManager()
 
 
 @app.get("/health")
@@ -1084,6 +1089,60 @@ async def websocket_session_sync(
     except Exception as e:
         logger.error(f"Error in collaborative websocket session {clean_sid}: {e}")
         await audit_session_manager.disconnect(websocket)
+
+
+# ============================================================================
+# Offline Air-Gapped Licensing Endpoints (Task S11-04)
+# ============================================================================
+
+@app.post("/api/v1/license/activate", response_model=LicenseActivationResponse)
+def activate_license(
+    req: LicenseActivationRequest,
+    user: User = Depends(require_permission(Permission.ADMIN_CONFIG)),
+):
+    """
+    Activates an air-gapped cryptographic enterprise license key.
+    Enforces Ed25519 digital signature validation and hardware machine fingerprinting.
+    """
+    payload_input = req.license_data if req.license_data is not None else req.license_key
+    if payload_input is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Missing license payload: license_key or license_data required",
+        )
+
+    success, message, status_resp = license_manager.activate(payload_input)
+    audit_logger.log_event(
+        user_id=user.user_id,
+        role=user.role.value,
+        action="LICENSE_ACTIVATE",
+        details={
+            "success": success,
+            "tier": status_resp.tier.value,
+            "customer_id": status_resp.customer_id,
+            "state": status_resp.state.value,
+        },
+    )
+
+    if not success:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=message)
+
+    return LicenseActivationResponse(
+        success=success,
+        message=message,
+        status=status_resp,
+    )
+
+
+@app.get("/api/v1/license/status", response_model=LicenseStatusResponse)
+def get_license_status(
+    user: User = Depends(require_permission(Permission.DOC_READ)),
+):
+    """
+    Returns current software license status, tier, features, and hardware fingerprint.
+    Zero-Leak (Rule 2): Never exposes private keys or raw hardware serials.
+    """
+    return license_manager.get_status()
 
 
 if __name__ == "__main__":

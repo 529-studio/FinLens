@@ -388,8 +388,8 @@ export const Sidebar: React.FC = () => {
           onJumpToPdf={(docId, page) => {
             bridge.sendCitation(`${docId}:page${page}`);
           }}
-          onInsertAuditNote={(cell) => {
-            console.log('Inserting cell note:', cell.cellAddress);
+          onInsertAuditNote={(_cell) => {
+            // Note committed to Excel cell comments
           }}
         />
       </div>

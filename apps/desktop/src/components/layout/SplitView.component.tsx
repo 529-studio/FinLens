@@ -69,7 +69,6 @@ export const SplitView: FC<SplitViewProps> = ({ documentId, documentTitle }) => 
   const daemon = useDaemonLifecycle();
 
   useBridgeServer((citationId) => {
-    console.log(`Navigation requested for citation: ${citationId}`);
     const allEvidences = [
       ...history.flatMap((h) => h.evidences),
       ...comparativeHistory.flatMap((c) => c.evidences),

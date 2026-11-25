@@ -4,7 +4,6 @@
  * and frontend-4file-and-resilient-ui (3 UI states, >=48px touch targets).
  */
 
-import React from 'react';
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { AnnotationCanvas } from '../AnnotationCanvas';

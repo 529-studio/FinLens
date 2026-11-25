@@ -346,7 +346,7 @@ export const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
         const ann = pageAnnotations.find((a) => a.annotation_id === selectedAnnotationId);
         if (!ann) return null;
 
-        const { top, left, width, height } = toPixels(ann.bounding_box);
+        const { top, left, height } = toPixels(ann.bounding_box);
         const popoverTop = top + height + 8;
         const popoverLeft = Math.min(Math.max(10, left), (renderedWidth * zoomLevel) - 320);
 

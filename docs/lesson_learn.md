@@ -371,3 +371,55 @@
 
 
 
+
+---
+
+### Bài học 35: Động Cơ Phát Hiện Bất Thường & Chênh Lệch Báo Cáo Tài Chính Đa Kỳ (Multi-Document Anomaly & Discrepancy Detection Engine)
+- **Bối cảnh & Thách thức:** Khi đối soát BCTC qua nhiều kỳ (ví dụ: số dư đầu kỳ năm sau bị điều chỉnh hồi tố so với số dư cuối kỳ năm trước, hoặc chênh lệch giữa BCTC chưa kiểm toán và đã kiểm toán), kiểm toán viên thường phải dò từng trang thủ công. Sự chênh lệch số học và điều chỉnh hồi tố (restatement) rất dễ bị bỏ sót nếu không có cơ chế đối chiếu tự động với ngưỡng phương sai (variance threshold).
+- **Giải pháp chuẩn hóa (Sprint 12 - Task S12-01):**
+  - *Động cơ đối chiếu xác định (Deterministic Discrepancy Engine):* Xây dựng `VarianceAuditor` trong `packages/core-engine/src/discrepancy_detector.py` hỗ trợ tính phương sai tuyệt đối và tương đối giữa hai kỳ tài liệu (`baseline_document_id` vs `comparison_document_id`).
+  - *Phân loại mức độ nghiêm trọng (Severity Classification):* Tự động gán nhãn `CRITICAL` (phương sai $> 20\%$ hoặc điều chỉnh hồi tố trọng yếu), `WARNING` ($> 5\%$), hoặc `INFO` kèm phân loại kiểu bất thường: `RESTATEMENT` (điều chỉnh hồi tố), `UNEXPECTED_SIGN_FLIP` (đảo chiều dấu bất thường), `MATERIAL_VARIANCE` (biến động trọng yếu), và `UNEXPLAINED_DRIFT`.
+  - *Bảo toàn 100% Visual Grounding (ADR-003):* Mỗi phát hiện bất thường đều lưu vết song song hai tọa độ BoundingBox $[ymin, xmin, ymax, xmax]$ tỷ lệ $[0, 1000]$ trên cả 2 tài liệu đối chiếu, cho phép Desktop viewer nhấp chuyển trang đồng thời so sánh split-view.
+  - *Phòng thủ Path Traversal:* Endpoint `POST /api/v1/audit/discrepancies` xác thực nghiêm ngặt mọi `document_id` bằng regex an toàn `^[a-zA-Z0-9_\-]+$`.
+
+---
+
+### Bài học 36: Xuất Gói Hồ Sơ Kiểm Toán Quy Chuẩn Tự Động (Automated Audit Trail Exporter & Regulatory Package Generator - XBRL & PDF/A-3 Container)
+- **Bối cảnh & Thách thức:** Để phục vụ thanh tra tài chính và nộp báo cáo cho các cơ quan quản lý (SEC, SSC, kiểm toán nhà nước), hồ sơ kiểm toán số phải tuân thủ chuẩn lưu trữ dài hạn (PDF/A-3 ISO 19005-3) và dữ liệu kế toán máy đọc được (Inline XBRL / iXBRL). Hơn nữa, toàn bộ lịch sử thao tác (audit trail) phải có bằng chứng chống giả mạo (tamper-evident proof) để đảm bảo không ai có thể can thiệp sửa đổi nhật ký sau khi xuất xưởng.
+- **Giải pháp chuẩn hóa (Sprint 12 - Task S12-02):**
+  - *Chuẩn hóa iXBRL & Thẻ ngữ cảnh tài chính:* Module `packages/core-engine/src/audit_packager.py` tự động sinh mã XML iXBRL với đầy đủ namespace quy chuẩn (`xmlns:ix`, `xmlns:xbrli`), context định danh doanh nghiệp, kỳ kế toán, đơn vị tiền tệ (`iso4217:VND`), mã số thuyết minh và tọa độ visual grounding.
+  - *Container lưu trữ dài hạn PDF/A-3:* Định dạng cấu trúc nhúng tệp đính kèm `/Type /Filespec` và `/AFRelationship /Data` tuân thủ tiêu chuẩn ISO 19005-3, cho phép tích hợp các tệp XML/CSV gốc ngay trong tệp PDF hiển thị.
+  - *Chuỗi băm chống giả mạo liên hoàn (Cryptographic SHA-256 Tamper-Evident Event Chain per ADR-007):* Mỗi sự kiện trong `audit_trail` được băm liên hoàn dạng blockchain ($H_n = \text{SHA256}(H_{n-1} + \text{canonical\_json}(E_n))$). Bất kỳ sự thay đổi hay xóa sự kiện nào cũng sẽ làm gãy chuỗi băm `final_hash`, cung cấp bằng chứng pháp lý tuyệt đối cho kiểm toán viên.
+  - *Đóng gói nén an toàn (ZIP Package Generator):* Tự động nén toàn bộ tài liệu iXBRL, PDF/A-3, manifest kiểm toán và chữ ký vào tệp `.zip` với cơ chế giải phóng tài nguyên tức thì, tránh memory leak.
+
+---
+
+### Bài học 37: Lớp Vẽ Chú Thích Vùng Đánh Dấu PDF Bản Địa & Ghim Nhận Xét Thị Giác (Desktop Native PDF Highlight Annotation Layer & Visual Comment Pinning)
+- **Bối cảnh & Thách thức:** Khi phân tích báo cáo tài chính trên FinSight Desktop, kiểm toán viên cần trực tiếp dùng chuột kéo thả để tạo các vùng đánh dấu (bounding box highlights) trên các bảng biểu hoặc đoạn thuyết minh phức tạp, đồng thời ghim ghi chú kiểm toán tại đúng tọa độ đó. Nếu lớp vẽ không chuẩn hóa theo tỷ lệ chuẩn `[0, 1000]` của PDF page canvas, tọa độ sẽ bị lệch khi người dùng phóng to/thu nhỏ (zoom) hoặc thay đổi kích thước cửa sổ (split-view resize).
+- **Giải pháp chuẩn hóa (Sprint 12 - Task S12-03):**
+  - *Lớp phủ tương tác mượt mà (AnnotationCanvas Component):* Xây dựng `apps/desktop/src/components/pdf/AnnotationCanvas.tsx` lắng nghe sự kiện chuột `onMouseDown`, `onMouseMove`, `onMouseUp` trên container tham chiếu `div.relative`.
+  - *Chuẩn hóa tọa độ tuyệt đối sang tỷ lệ `[0, 1000]` (ADR-003 Mathematical Invariant):* Sử dụng hàm biến đổi tỷ lệ $coord_{1000} = \text{clamp}(\text{round}(\frac{px}{container\_dim} \times 1000), 0, 1000)$, đảm bảo tọa độ độc lập tuyệt đối với độ phân giải màn hình hoặc tỷ lệ zoom.
+  - *Ghim nhận xét và chọn lọc (Visual Pinning & Selection):* Cho phép người dùng nhấp chọn từng khung chú thích để mở bảng ghim nhận xét, gán loại nhận xét (`discrepancy`, `verified`, `question`, `restated`), chỉnh sửa nội dung và lưu trữ.
+  - *Ergonomics & Zero-Emoji (Rule 15):* 100% icon SVG từ Lucide React (`Highlighter`, `MessageSquare`, `Trash2`, `CheckCircle2`), nút bấm thao tác đạt chuẩn $\ge 48\text{px}$, và 3 trạng thái giao diện linh hoạt (Shimmer Skeleton khi nạp chú thích, Empty state hướng dẫn kéo chuột, và Error state có nút thử lại).
+
+---
+
+### Bài học 38: Cô Lập Vùng Làm Việc Doanh Nghiệp Đa Đối Tượng & Mã Hóa Dữ Liệu Lưu Trữ (Multi-Tenant Enterprise Workspace Isolation & Cryptographic Encryption at Rest)
+- **Bối cảnh & Thách thức:** Trong môi trường triển khai doanh nghiệp (Enterprise On-Premise hoặc Private Cloud), nhiều chi nhánh hoặc nhóm kiểm toán độc lập cùng sử dụng hệ thống. Cần đảm bảo tuyệt đối không có sự rò rỉ dữ liệu chéo (cross-tenant leakage). Tệp tài liệu BCTC, vector embedding và chỉ mục đối soát phải được mã hóa tại nơi lưu trữ (Encryption at Rest) và thư mục lưu trữ phải được phân quyền hệ điều hành nghiêm ngặt.
+- **Giải pháp chuẩn hóa (Sprint 12 - Task S12-04):**
+  - *Mô hình cô lập thư mục theo Tenant ID:* Module `packages/core-engine/src/workspace_security.py` tổ chức các thư mục lưu trữ riêng biệt theo cấu trúc `~/.finsight/workspaces/{tenant_id}/{workspace_id}/`. Thư mục được tạo với quyền truy cập POSIX nghiêm ngặt `0o700` (chỉ tiến trình FinSight sở hữu mới có quyền đọc/ghi/thực thi) và tệp được bảo vệ bằng `0o600`.
+  - *Dẫn xuất khóa mã hóa bảo mật cao (PBKDF2-HMAC-SHA256):* Khóa mã hóa cho từng workspace được sinh từ Master Key và Tenant Salt qua 100,000 vòng lặp PBKDF2-HMAC-SHA256, sinh ra khóa 256-bit độc lập.
+  - *Mã hóa xác thực đối xứng AES-256-GCM:* Dữ liệu BCTC lưu trữ được mã hóa qua thuật toán AES-256-GCM với 12-byte Nonce/IV ngẫu nhiên sinh từ `os.urandom(12)` và 16-byte Authentication Tag chống sửa đổi. Hỗ trợ dự phòng mã hóa xác thực Fernet (HMAC-SHA256 + AES-128-CBC) khi môi trường không có thư viện cryptography bên ngoài.
+  - *Phòng thủ Path Traversal tuyệt đối:* Toàn bộ `tenant_id` và `workspace_id` được kiểm tra chặt chẽ, loại bỏ hoàn toàn các ký tự `..`, `/`, `\`. Endpoint `POST /api/v1/workspaces/verify-access` trả về `403 Forbidden` ngay lập tức nếu phát hiện hành vi truy cập chéo tenant.
+
+---
+
+### Bài học 39: Ngăn Kéo Thuyết Minh Liên Kết Thời Gian Thực & Thẻ Ô Kiểm Toán Bảng Tính Excel (Excel Add-in Live Linked Footnote Citation Drawer & In-Sheet Audited Cell Tags)
+- **Bối cảnh & Thách thức:** Chuyên viên phân tích tài chính làm việc trên Excel thường xuyên cần kiểm tra tính xác thực của các con số quan trọng (Doanh thu, Lợi nhuận gộp, Nợ vay) với các thuyết minh chi tiết trong BCTC gốc. Nếu không có ngăn kéo hiển thị trực tiếp thông tin kiểm toán (audit drawer), chuyên viên phải chuyển đổi qua lại giữa nhiều cửa sổ rất mất thời gian.
+- **Giải pháp chuẩn hóa (Sprint 12 - Task S12-05):**
+  - *Ngăn kéo thuyết minh thời gian thực (AuditedCellDrawer Component):* Xây dựng `apps/excel/src/components/AuditedCellDrawer.tsx` hiển thị mã ô (`Sheet1!B4`), chỉ tiêu tài chính, giá trị định dạng, mã số thuyết minh (ví dụ `VI.24`), tiêu đề và tóm tắt thuyết minh.
+  - *Huy hiệu độ tin cậy & Thẻ trạng thái:* Hiển thị trực quan trạng thái kiểm toán (`verified`, `restated`, `discrepancy`, `pending`) kèm thanh điểm tin cậy trực quan (`confidence score`, ví dụ $99\%$) và tọa độ BoundingBox $[ymin, xmin, ymax, xmax]$.
+  - *Hai hành động tương tác chính với Kiosk Ergonomics ($\ge 48\text{px}$):*
+    - `Xem tài liệu nguồn`: Gửi tín hiệu qua cầu nối liên ứng dụng (`bridge.sendCitation`) để tự động mở ứng dụng Desktop và nhảy thẳng đến đúng trang và vị trí của con số trên bản PDF gốc.
+    - `Gắn ghi chú kiểm toán vào ô Excel`: Tự động nhúng toàn bộ thông tin đối soát, số hiệu thuyết minh và thời gian kiểm toán vào comment của ô trong bảng tính.
+  - *Tuân thủ 3 trạng thái giao diện & Zero-Emoji (Rule 15):* Áp dụng Skeleton hiệu ứng pulse shimmer khi nạp dữ liệu, Error state có nút Thử lại, và Empty state khi chưa chọn ô. 100% sử dụng Lucide React SVG (`Tag`, `ExternalLink`, `ShieldCheck`, `BookOpen`, `RefreshCw`, `AlertCircle`, `CheckCircle2`), không sử dụng bất kỳ emoji thô nào.

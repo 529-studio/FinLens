@@ -100,6 +100,24 @@ export const SplitView: FC<SplitViewProps> = ({ documentId, documentTitle }) => 
     const evidence = allEvidences.find((e) => e.label === citationId);
     if (evidence) {
       focusEvidence(evidence);
+      return;
+    }
+
+    // Parse cross-app Excel bridge formats: "<docId>:page<N>" or "<docId>_P<N>"
+    const colonMatch = citationId.match(/^([a-zA-Z0-9_\-]+):page(\d+)$/);
+    const underscoreMatch = citationId.match(/^([a-zA-Z0-9_\-]+)_P(\d+)$/);
+    const matched = colonMatch || underscoreMatch;
+    if (matched) {
+      const targetDocId = matched[1];
+      const targetPage = Math.max(1, parseInt(matched[2], 10));
+      setActiveDocId(targetDocId);
+      setCurrentPage(targetPage);
+      const docEvidence = allEvidences.find(
+        (e) => (e.document_id || activeDocId) === targetDocId && e.page_number === targetPage
+      );
+      if (docEvidence) {
+        focusEvidence(docEvidence);
+      }
     }
   });
 

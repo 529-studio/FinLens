@@ -57,6 +57,43 @@ export const WaterfallChart: React.FC<WaterfallChartProps> = ({
   const [selectedStep, setSelectedStep] = useState<WaterfallStep | null>(null);
   const [exportNotice, setExportNotice] = useState<string | null>(null);
 
+  const safeDrivers = initialDrivers || [];
+  const activeScenarioConfig = SCENARIO_CONFIGS[scenario];
+  const appliedDrivers = useMemo(() => {
+    return safeDrivers.length > 0 ? applyScenarioToDrivers(safeDrivers, scenario) : [];
+  }, [safeDrivers, scenario]);
+
+  const steps: WaterfallStep[] = useMemo(() => {
+    return appliedDrivers.length > 0 ? computeWaterfallSteps(appliedDrivers, safeDrivers) : [];
+  }, [appliedDrivers, safeDrivers]);
+
+  const netIncomeStep = steps.find((s) => s.id === 'net_income') || steps[steps.length - 1];
+
+  const handleExportPdf = useCallback(() => {
+    const citations: GroundingCitation[] = [];
+    steps.forEach((s) => {
+      if (s.citation) citations.push(s.citation);
+    });
+
+    const report: WaterfallExportReport = {
+      title: 'Báo Cáo Phân Tích Cầu Nối Lợi Nhuận & So Sánh Kịch Bản',
+      companyName,
+      reportingPeriod,
+      scenario,
+      scenarioLabel: activeScenarioConfig.label,
+      steps,
+      citations,
+      exportedAt: new Date().toLocaleString('vi-VN'),
+      netIncomeValue: netIncomeStep?.signedValue || 0,
+    };
+
+    const ok = exportWaterfallToPdfOrPrint(report);
+    if (ok) {
+      setExportNotice('Đã xuất báo cáo kiểm toán PDF thành công');
+      setTimeout(() => setExportNotice(null), 3000);
+    }
+  }, [steps, companyName, reportingPeriod, scenario, activeScenarioConfig, netIncomeStep]);
+
   // 1. Loading State: Skeleton Layout
   if (isLoading) {
     return (
@@ -145,25 +182,13 @@ export const WaterfallChart: React.FC<WaterfallChartProps> = ({
     );
   }
 
-  // Compute active scenario steps
-  const activeScenarioConfig = SCENARIO_CONFIGS[scenario];
-  const appliedDrivers = useMemo(() => {
-    return applyScenarioToDrivers(initialDrivers, scenario);
-  }, [initialDrivers, scenario]);
-
-  const steps: WaterfallStep[] = useMemo(() => {
-    return computeWaterfallSteps(appliedDrivers, initialDrivers);
-  }, [appliedDrivers, initialDrivers]);
-
-  const netIncomeStep = steps.find((s) => s.id === 'net_income') || steps[steps.length - 1];
-
-  // SVG Dimension Math
+  // SVG Dimension Math (responsive viewBox fitting narrow Excel taskpanes)
   const svgWidth = 680;
-  const svgHeight = 280;
+  const svgHeight = 300;
   const marginTop = 30;
-  const marginBottom = 50;
-  const marginLeft = 30;
-  const marginRight = 30;
+  const marginBottom = 60;
+  const marginLeft = 24;
+  const marginRight = 24;
 
   const chartWidth = svgWidth - marginLeft - marginRight;
   const chartHeight = svgHeight - marginTop - marginBottom;
@@ -172,7 +197,7 @@ export const WaterfallChart: React.FC<WaterfallChartProps> = ({
   const minVal = Math.min(...steps.map((s) => Math.min(s.startValue, s.endValue)), 0);
   const valueRange = maxVal - minVal || 1;
 
-  const barCount = steps.length;
+  const barCount = steps.length || 1;
   const barSpacing = chartWidth / barCount;
   const barWidth = Math.min(barSpacing * 0.65, 56);
 
@@ -181,31 +206,6 @@ export const WaterfallChart: React.FC<WaterfallChartProps> = ({
   };
 
   const zeroY = getY(0);
-
-  const handleExportPdf = useCallback(() => {
-    const citations: GroundingCitation[] = [];
-    steps.forEach((s) => {
-      if (s.citation) citations.push(s.citation);
-    });
-
-    const report: WaterfallExportReport = {
-      title: 'Báo Cáo Phân Tích Cầu Nối Lợi Nhuận & So Sánh Kịch Bản',
-      companyName,
-      reportingPeriod,
-      scenario,
-      scenarioLabel: activeScenarioConfig.label,
-      steps,
-      citations,
-      exportedAt: new Date().toLocaleString('vi-VN'),
-      netIncomeValue: netIncomeStep?.signedValue || 0,
-    };
-
-    const ok = exportWaterfallToPdfOrPrint(report);
-    if (ok) {
-      setExportNotice('Đã xuất báo cáo kiểm toán PDF thành công');
-      setTimeout(() => setExportNotice(null), 3000);
-    }
-  }, [steps, companyName, reportingPeriod, scenario, activeScenarioConfig, netIncomeStep]);
 
   return (
     <div
@@ -288,11 +288,12 @@ export const WaterfallChart: React.FC<WaterfallChartProps> = ({
       </div>
 
       {/* 3. SVG Waterfall Canvas */}
-      <div className="relative w-full overflow-x-auto bg-slate-950/70 border border-slate-800 rounded-xl p-3">
+      <div className="relative w-full overflow-hidden bg-slate-950/70 border border-slate-800 rounded-xl p-2.5">
         <svg
           data-testid="waterfall-svg"
           viewBox={`0 0 ${svgWidth} ${svgHeight}`}
-          className="w-full h-auto min-w-[580px]"
+          preserveAspectRatio="xMidYMid meet"
+          className="w-full h-auto block"
         >
           {/* Zero baseline */}
           <line

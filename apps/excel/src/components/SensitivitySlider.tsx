@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import {
   Sliders,
   TrendingUp,
@@ -15,6 +15,7 @@ import {
   DependencyGraph,
   SensitivityResult,
   buildDependencyGraph,
+  recalculateModel,
   runSensitivityAnalysis,
   updateWorksheetCellValue,
 } from '../lib/formulaAuditor';
@@ -67,6 +68,15 @@ export const SensitivitySlider: React.FC<SensitivitySliderProps> = ({
   const [showFormulaTree, setShowFormulaTree] = useState(false);
   const [calculationError, setCalculationError] = useState<string | null>(null);
   const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'synced' | 'failed'>('idle');
+  const syncTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (syncTimeoutRef.current) {
+        clearTimeout(syncTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Build model dependency graph
   const modelCells = customCells || DEFAULT_MODEL_CELLS;
@@ -79,16 +89,19 @@ export const SensitivitySlider: React.FC<SensitivitySliderProps> = ({
     }
   }, [modelCells]);
 
-  // Base values dictionary
+  // Base values dictionary (evaluating formula baselines so derived KPIs don't display 0)
   const baseValues: Record<string, number> = useMemo(() => {
-    const vals: Record<string, number> = {};
+    const rawVals: Record<string, number> = {};
     for (const [addr, cell] of Object.entries(modelCells)) {
       if (typeof cell.value === 'number') {
-        vals[addr] = cell.value;
+        rawVals[addr] = cell.value;
       }
     }
-    return vals;
-  }, [modelCells]);
+    if (graph.hasCycles) {
+      return rawVals;
+    }
+    return recalculateModel(driverAddress, baseValue, graph, rawVals);
+  }, [modelCells, graph, driverAddress, baseValue]);
 
   // Compute stressed driver value
   const stressedDriverValue = useMemo(() => {
@@ -148,7 +161,10 @@ export const SensitivitySlider: React.FC<SensitivitySliderProps> = ({
       if (res.success) {
         setSyncStatus('synced');
         if (onRecalculate) onRecalculate(sensitivityResult);
-        setTimeout(() => setSyncStatus('idle'), 2500);
+        if (syncTimeoutRef.current) {
+          clearTimeout(syncTimeoutRef.current);
+        }
+        syncTimeoutRef.current = setTimeout(() => setSyncStatus('idle'), 2500);
       } else {
         setSyncStatus('failed');
       }

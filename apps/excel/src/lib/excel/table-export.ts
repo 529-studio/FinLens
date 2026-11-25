@@ -153,3 +153,45 @@ export async function insertFinancialTableToSheet(
     footnotesCount: data.footnotes ? data.footnotes.length : 0,
   };
 }
+
+/**
+ * Inserts an audit trail comment directly onto a target Excel cell (e.g. "Sheet1!B4" or "B4"),
+ * safely parsing optional Sheet! prefix and falling back to active worksheet / preview outside Excel.
+ */
+export async function insertCellAuditComment(
+  cellAddress: string,
+  commentText: string
+): Promise<{ success: boolean; address: string; comment: string }> {
+  const trimmed = (cellAddress || '').trim();
+  const bangIdx = trimmed.indexOf('!');
+  const sheetName = bangIdx > 0 ? trimmed.slice(0, bangIdx).replace(/^'|'$/g, '') : null;
+  const cellOnly = bangIdx > 0 ? trimmed.slice(bangIdx + 1) : trimmed || 'A1';
+
+  if (typeof Excel !== 'undefined' && typeof Excel.run === 'function') {
+    return Excel.run(async (context) => {
+      let sheet = context.workbook.worksheets.getActiveWorksheet();
+      if (sheetName) {
+        const namedSheet = context.workbook.worksheets.getItemOrNullObject(sheetName);
+        namedSheet.load('name');
+        await context.sync();
+        if (!namedSheet.isNullObject) {
+          sheet = namedSheet;
+        }
+      }
+      const range = sheet.getRange(cellOnly);
+      context.workbook.comments.add(range, commentText, 'Plain');
+      await context.sync();
+      return {
+        success: true,
+        address: trimmed || cellOnly,
+        comment: commentText,
+      };
+    });
+  }
+
+  return {
+    success: true,
+    address: trimmed || cellOnly,
+    comment: commentText,
+  };
+}

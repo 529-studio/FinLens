@@ -5,7 +5,7 @@ import { SidebarSkeleton } from './SidebarSkeleton';
 import { DocumentUploader } from './DocumentUploader';
 import { bridge } from '../lib/bridge/client';
 import { DocumentIngestResponseDTO, ActiveDocumentState, FinancialTableData } from '../types/api';
-import { insertFinancialTableToSheet } from '../lib/excel/table-export';
+import { insertFinancialTableToSheet, insertCellAuditComment } from '../lib/excel/table-export';
 import { SensitivitySlider } from './SensitivitySlider';
 import { WaterfallChart } from './WaterfallChart';
 import { AuditedCellDrawer, type AuditedCellData } from './AuditedCellDrawer';
@@ -38,6 +38,7 @@ export const Sidebar: React.FC = () => {
     status: 'idle' | 'exporting' | 'success' | 'error';
     message?: string;
   }>({ status: 'idle' });
+  const [auditNoteNotice, setAuditNoteNotice] = useState<string | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState<boolean>(true);
   const [selectedCellData] = useState<AuditedCellData | null>({
     cellAddress: 'Sheet1!B4',
@@ -441,10 +442,23 @@ export const Sidebar: React.FC = () => {
           onJumpToPdf={(docId, page) => {
             bridge.sendCitation(`${docId}:page${page}`);
           }}
-          onInsertAuditNote={(_cell) => {
-            // Note committed to Excel cell comments
+          onInsertAuditNote={async (cell) => {
+            const note = `[FinTrace Audit] ${cell.lineItem} (${cell.formattedValue}) — Nguồn: ${cell.documentId}, Trang ${cell.pageNumber}${cell.footnoteNumber ? `, TM ${cell.footnoteNumber}` : ''} | Tin cậy ${(cell.confidence * 100).toFixed(1)}%`;
+            const res = await insertCellAuditComment(cell.cellAddress, note);
+            if (res.success) {
+              setAuditNoteNotice(`Đã gắn ghi chú kiểm toán vào ô ${res.address}`);
+            }
           }}
         />
+        {auditNoteNotice && (
+          <div
+            data-testid="audit-note-status"
+            className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-lg text-emerald-800 text-[11px] flex items-center gap-2"
+          >
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+            <span>{auditNoteNotice}</span>
+          </div>
+        )}
       </div>
     </div>
   );

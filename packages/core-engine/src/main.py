@@ -12,8 +12,9 @@ import uuid
 import logging
 from typing import Optional, List, Dict, Any
 from pathlib import Path
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, status, UploadFile, File, Form, Depends, Query
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, status, UploadFile, File, Form, Depends, Query, Path as PathParam
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from dotenv import load_dotenv
 
 logger = logging.getLogger("finsight.main")
@@ -65,6 +66,8 @@ from contracts import (
     TenantWorkspaceResponse,
     TenantAccessVerificationRequest,
     TenantAccessVerificationResponse,
+    DocumentInfoResponse,
+    is_path_safe,
 )
 from table_stitcher import TableStitcher
 from comparative_query import PortfolioSynthesisEngine
@@ -366,6 +369,99 @@ def list_indexed_documents():
     """Lists all indexed documents currently persisted in LanceDB."""
     docs = retriever.store.list_documents()
     return DocumentListResponse(documents=docs, total=len(docs))
+
+
+def _resolve_safe_doc_dir(doc_id: str) -> Path:
+    """Validates doc_id strictly and resolves its rendered page cache directory."""
+    if not doc_id or "\0" in doc_id or ".." in doc_id or not re.match(r"^[a-zA-Z0-9_\-]+$", doc_id) or len(doc_id) > 64:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid document_id: must be alphanumeric with '_' or '-' (<= 64 chars)",
+        )
+    base_dir = renderer.output_base_dir.resolve()
+    doc_dir = (base_dir / doc_id).resolve()
+    if doc_dir.parent != base_dir:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Access denied: document_id escapes rendered cache directory",
+        )
+    return doc_dir
+
+
+@app.get("/api/v1/documents/{doc_id}/info", response_model=DocumentInfoResponse)
+def get_document_info(doc_id: str, user: User = Depends(require_permission(Permission.DOC_READ))):
+    """Returns total page count and available rendered page numbers for a document."""
+    doc_dir = _resolve_safe_doc_dir(doc_id)
+    page_nums = set()
+
+    if doc_dir.exists() and doc_dir.is_dir():
+        for png in doc_dir.glob("page_*.png"):
+            match = re.match(r"^page_(\d+)\.png$", png.name)
+            if match:
+                page_nums.add(int(match.group(1)))
+
+    try:
+        stored_pages = retriever.store.get_pages(doc_id)
+        for p in stored_pages:
+            pnum = int(p.get("page_number", 0))
+            if pnum >= 1:
+                page_nums.add(pnum)
+    except Exception:
+        pass
+
+    if not page_nums:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Document '{doc_id}' not found",
+        )
+
+    sorted_pages = sorted(page_nums)
+    return DocumentInfoResponse(
+        document_id=doc_id,
+        total_pages=max(len(sorted_pages), sorted_pages[-1]),
+        available_pages=sorted_pages,
+    )
+
+
+@app.get("/api/v1/documents/{doc_id}/pages/{page_number}")
+def get_document_page_image(
+    doc_id: str,
+    page_number: int = PathParam(..., ge=1, le=5000),
+    user: User = Depends(require_permission(Permission.DOC_READ)),
+):
+    """Serves the rendered PNG image for a specific document page with path traversal defense."""
+    doc_dir = _resolve_safe_doc_dir(doc_id)
+    candidate = (doc_dir / f"page_{page_number:04d}.png").resolve()
+    if candidate.parent != doc_dir:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Access denied: invalid page path",
+        )
+
+    if not candidate.is_file():
+        # Check stored page image_path if indexed from an approved benchmark/cache directory
+        try:
+            stored_pages = retriever.store.get_pages(doc_id)
+            for p in stored_pages:
+                if int(p.get("page_number", 0)) == page_number and p.get("image_path"):
+                    alt_path = Path(str(p["image_path"])).expanduser().resolve()
+                    if is_path_safe(str(alt_path)) and alt_path.is_file():
+                        candidate = alt_path
+                        break
+        except Exception:
+            pass
+
+    if not candidate.is_file():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Rendered page {page_number} for document '{doc_id}' not found",
+        )
+
+    return FileResponse(
+        path=str(candidate),
+        media_type="image/png",
+        headers={"Cache-Control": "public, max-age=300"},
+    )
 
 
 @app.delete("/api/v1/documents/{doc_id}")

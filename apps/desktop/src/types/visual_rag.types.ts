@@ -84,4 +84,15 @@ export interface DocumentIngestResponseDTO {
   from_cache?: boolean;
 }
 
+export interface DocumentInfoDTO {
+  document_id: string;
+  total_pages: number;
+  available_pages: number[];
+}
+
+export interface RenderedPageSize {
+  width: number;
+  height: number;
+}
+
 export type UIState = 'idle' | 'loading' | 'success' | 'error';

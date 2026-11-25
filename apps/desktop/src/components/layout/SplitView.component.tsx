@@ -6,11 +6,12 @@
  * - Multi-Document Comparative Visual RAG (Sprint 7 Task S7-02)
  */
 
-import { useState, type FormEvent, type FC } from 'react';
+import { useState, useEffect, useCallback, type FormEvent, type FC } from 'react';
 import { useVisualRag } from '../../hooks/useVisualRag.hook';
 import { useSettings } from '../../hooks/useSettings.hook';
 import { useBridgeServer } from '../../hooks/useBridgeServer';
 import { useDaemonLifecycle } from '../../hooks/useDaemonLifecycle';
+import { fetchDocumentInfo } from '../../api/visual_rag.fetch';
 import { ResizableSplitView } from './ResizableSplitView';
 import { BoundingBoxOverlay } from '../pdf/BoundingBoxOverlay';
 import { AnnotationCanvas } from '../pdf/AnnotationCanvas';
@@ -18,6 +19,7 @@ import { PdfViewer } from '../pdf/PdfViewer';
 import { SettingsDialog } from '../settings/SettingsDialog';
 import { FootnoteChip } from '../chat/FootnoteChip';
 import type { AuditAnnotationDTO } from '../../types/session_sync.types';
+import type { RenderedPageSize } from '../../types/visual_rag.types';
 import {
   FileText,
   Send,
@@ -35,6 +37,8 @@ import {
   TrendingUp,
   Layers,
   Highlighter,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 
 interface SplitViewProps {
@@ -50,6 +54,9 @@ export const SplitView: FC<SplitViewProps> = ({ documentId, documentTitle }) => 
   const [selectedDocIds] = useState<string[]>(['VNM_2022_COMP', 'VNM_2023_COMP']);
   const [isDrawingEnabled, setIsDrawingEnabled] = useState<boolean>(false);
   const [annotations, setAnnotations] = useState<AuditAnnotationDTO[]>([]);
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [totalPages, setTotalPages] = useState<number>(1);
+  const [pageSize, setPageSize] = useState<RenderedPageSize>({ width: 560, height: 792 });
 
   const {
     state,
@@ -95,32 +102,83 @@ export const SplitView: FC<SplitViewProps> = ({ documentId, documentTitle }) => 
   const handleZoomOut = () => setZoomLevel((z) => Math.max(0.6, Math.round((z - 0.1) * 10) / 10));
   const handleZoomReset = () => setZoomLevel(1.0);
 
+  const viewedDocumentId = activeEvidence?.document_id || documentId;
+
+  useEffect(() => {
+    if (activeEvidence?.page_number) {
+      setCurrentPage(activeEvidence.page_number);
+    }
+  }, [activeEvidence]);
+
+  useEffect(() => {
+    if (!viewedDocumentId || typeof fetch !== 'function') return;
+    const controller = new AbortController();
+    fetchDocumentInfo(viewedDocumentId, controller.signal)
+      .then((info) => {
+        if (!controller.signal.aborted && info.total_pages > 0) {
+          setTotalPages(info.total_pages);
+          setCurrentPage((prev) => Math.min(Math.max(1, prev), info.total_pages));
+        }
+      })
+      .catch(() => {
+        // Ignore gracefully when daemon is offline or in unit test jsdom
+      });
+    return () => controller.abort();
+  }, [viewedDocumentId]);
+
+  const handlePageRendered = useCallback((size: RenderedPageSize) => {
+    setPageSize(size);
+  }, []);
+
   const leftPaneContent = (
     <div className="h-full w-full flex flex-col relative bg-slate-900 border-r border-slate-800 overflow-hidden">
-      <header className="h-14 border-b border-slate-800 px-4 flex items-center justify-between gap-2 flex-shrink-0">
+      <header className="h-16 border-b border-slate-800 px-4 flex items-center justify-between gap-2 flex-shrink-0">
         <div className="flex items-center space-x-2 min-w-0">
           <FileText className="w-5 h-5 text-indigo-400 flex-shrink-0" />
-          <span className="font-semibold text-sm truncate max-w-[200px] 2xl:max-w-md">
+          <span className="font-semibold text-sm truncate">
             {activeEvidence?.document_id ? `${activeEvidence.document_id} (Trích dẫn)` : documentTitle}
           </span>
         </div>
 
-        <div className="flex items-center space-x-3 flex-shrink-0">
-          {activeEvidence && (
-            <div className="hidden sm:flex items-center space-x-2 bg-indigo-950/70 border border-indigo-700/50 px-2.5 py-1 rounded text-xs text-indigo-300 truncate max-w-xs">
-              <Eye className="w-3.5 h-3.5 text-indigo-400 flex-shrink-0" />
-              <span className="truncate">
-                {activeEvidence.document_id ? `[${activeEvidence.document_id}] ` : ''}Trang {activeEvidence.page_number}: {activeEvidence.label}
-              </span>
-            </div>
-          )}
+        <div className="flex items-center space-x-2 flex-shrink-0">
+          {/* Page Navigation Controls (>=48px touch targets) */}
+          <div className="flex items-center space-x-1 bg-slate-800/90 border border-slate-700 rounded-lg px-1 shadow-sm">
+            <button
+              type="button"
+              data-testid="btn-prev-page"
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              disabled={currentPage <= 1}
+              className="min-h-[48px] min-w-[40px] px-2 hover:bg-slate-700 disabled:opacity-40 text-slate-300 rounded text-xs transition flex items-center justify-center cursor-pointer"
+              title="Trang trước"
+              aria-label="Trang trước"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <span
+              data-testid="page-indicator"
+              className="px-1.5 text-[11px] font-mono text-slate-200 whitespace-nowrap"
+            >
+              Trang {currentPage}/{totalPages}
+            </span>
+            <button
+              type="button"
+              data-testid="btn-next-page"
+              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              disabled={currentPage >= totalPages}
+              className="min-h-[48px] min-w-[40px] px-2 hover:bg-slate-700 disabled:opacity-40 text-slate-300 rounded text-xs transition flex items-center justify-center cursor-pointer"
+              title="Trang sau"
+              aria-label="Trang sau"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
 
-          {/* Interactive Zoom Controls */}
-          <div className="flex items-center space-x-1 bg-slate-800/90 border border-slate-700 rounded-lg p-0.5 shadow-sm">
+          {/* Interactive Zoom Controls (>=48px touch targets) */}
+          <div className="flex items-center space-x-1 bg-slate-800/90 border border-slate-700 rounded-lg px-1 shadow-sm">
             <button
               type="button"
               onClick={handleZoomOut}
-              className="p-1 hover:bg-slate-700 text-slate-300 rounded text-xs transition"
+              className="min-h-[48px] min-w-[40px] px-2 hover:bg-slate-700 text-slate-300 rounded text-xs transition flex items-center justify-center cursor-pointer"
               title="Thu nhỏ (Zoom Out)"
               aria-label="Thu nhỏ"
             >
@@ -129,7 +187,7 @@ export const SplitView: FC<SplitViewProps> = ({ documentId, documentTitle }) => 
             <button
               type="button"
               onClick={handleZoomReset}
-              className="px-1.5 py-0.5 hover:bg-slate-700 text-slate-300 rounded text-[11px] font-mono transition"
+              className="min-h-[48px] px-2 hover:bg-slate-700 text-slate-300 rounded text-[11px] font-mono transition flex items-center justify-center cursor-pointer"
               title="Đặt lại 100%"
             >
               {Math.round(zoomLevel * 100)}%
@@ -137,7 +195,7 @@ export const SplitView: FC<SplitViewProps> = ({ documentId, documentTitle }) => 
             <button
               type="button"
               onClick={handleZoomIn}
-              className="p-1 hover:bg-slate-700 text-slate-300 rounded text-xs transition"
+              className="min-h-[48px] min-w-[40px] px-2 hover:bg-slate-700 text-slate-300 rounded text-xs transition flex items-center justify-center cursor-pointer"
               title="Phóng to (Zoom In)"
               aria-label="Phóng to"
             >
@@ -162,24 +220,34 @@ export const SplitView: FC<SplitViewProps> = ({ documentId, documentTitle }) => 
         </div>
       </header>
 
-      <div className="flex-1 relative overflow-auto p-6 flex justify-center items-start sm:items-center bg-slate-950/50">
-        <div className="relative shadow-2xl overflow-hidden flex-shrink-0 my-auto">
+      {activeEvidence && (
+        <div className="border-b border-slate-800/80 bg-indigo-950/30 px-4 py-1.5 flex items-center space-x-2 text-xs text-indigo-300 flex-shrink-0">
+          <Eye className="w-3.5 h-3.5 text-indigo-400 flex-shrink-0" />
+          <span className="truncate">
+            {activeEvidence.document_id ? `[${activeEvidence.document_id}] ` : ''}Trang {activeEvidence.page_number}: {activeEvidence.label}
+          </span>
+        </div>
+      )}
+
+      <div className="flex-1 relative overflow-auto p-6 flex justify-center items-start bg-slate-950/50">
+        <div className="relative shadow-2xl overflow-visible flex-shrink-0 my-auto">
           <PdfViewer
-            documentId={activeEvidence?.document_id || documentId}
-            pageNumber={activeEvidence?.page_number || 1}
+            documentId={viewedDocumentId}
+            pageNumber={currentPage}
             zoomLevel={zoomLevel}
+            onPageRendered={handlePageRendered}
           />
           <BoundingBoxOverlay
-            evidence={activeEvidence}
-            renderedWidth={500}
-            renderedHeight={700}
+            evidence={activeEvidence && activeEvidence.page_number === currentPage ? activeEvidence : null}
+            renderedWidth={pageSize.width}
+            renderedHeight={pageSize.height}
             zoomLevel={zoomLevel}
           />
           <AnnotationCanvas
-            documentId={activeEvidence?.document_id || documentId}
-            pageNumber={activeEvidence?.page_number || 1}
-            renderedWidth={500}
-            renderedHeight={700}
+            documentId={viewedDocumentId}
+            pageNumber={currentPage}
+            renderedWidth={pageSize.width}
+            renderedHeight={pageSize.height}
             zoomLevel={zoomLevel}
             annotations={annotations}
             isDrawingEnabled={isDrawingEnabled}

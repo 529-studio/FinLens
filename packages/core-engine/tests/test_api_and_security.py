@@ -406,6 +406,34 @@ def test_upload_empty_file_rejected():
     assert "empty" in res.json()["detail"].lower()
 
 
+def test_get_document_info_and_page_image_success():
+    """Verify /info and /pages/{page_number} return metadata and valid PNG bytes."""
+    info_res = client.get("/api/v1/documents/VNM_UPLOAD_TEST/info")
+    assert info_res.status_code == 200
+    info_data = info_res.json()
+    assert info_data["document_id"] == "VNM_UPLOAD_TEST"
+    assert info_data["total_pages"] == 2
+    assert info_data["available_pages"] == [1, 2]
+
+    page_res = client.get("/api/v1/documents/VNM_UPLOAD_TEST/pages/1")
+    assert page_res.status_code == 200
+    assert page_res.headers["content-type"].startswith("image/png")
+    assert page_res.content.startswith(b"\x89PNG\r\n\x1a\n")
+
+
+def test_get_document_page_traversal_and_not_found_rejected():
+    """Verify path traversal and missing pages are rejected safely."""
+    res_bad_id = client.get("/api/v1/documents/..%2F..%2Fetc/pages/1")
+    assert res_bad_id.status_code in (400, 404, 422)
+
+    res_bad_chars = client.get("/api/v1/documents/doc$evil/info")
+    assert res_bad_chars.status_code == 400
+
+    res_missing_page = client.get("/api/v1/documents/VNM_UPLOAD_TEST/pages/999")
+    assert res_missing_page.status_code == 404
+
+
+
 
 
 

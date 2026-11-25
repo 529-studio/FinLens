@@ -11,11 +11,13 @@ import { useVisualRag } from '../../hooks/useVisualRag.hook';
 import { useSettings } from '../../hooks/useSettings.hook';
 import { useBridgeServer } from '../../hooks/useBridgeServer';
 import { useDaemonLifecycle } from '../../hooks/useDaemonLifecycle';
+import { useDocuments } from '../../hooks/useDocuments.hook';
 import { fetchDocumentInfo } from '../../api/visual_rag.fetch';
 import { ResizableSplitView } from './ResizableSplitView';
 import { BoundingBoxOverlay } from '../pdf/BoundingBoxOverlay';
 import { AnnotationCanvas } from '../pdf/AnnotationCanvas';
 import { PdfViewer } from '../pdf/PdfViewer';
+import { DocumentPickerModal } from '../pdf/DocumentPickerModal';
 import { SettingsDialog } from '../settings/SettingsDialog';
 import { FootnoteChip } from '../chat/FootnoteChip';
 import type { AuditAnnotationDTO } from '../../types/session_sync.types';
@@ -39,6 +41,8 @@ import {
   Highlighter,
   ChevronLeft,
   ChevronRight,
+  FolderOpen,
+  Check,
 } from 'lucide-react';
 
 interface SplitViewProps {
@@ -47,16 +51,29 @@ interface SplitViewProps {
 }
 
 export const SplitView: FC<SplitViewProps> = ({ documentId, documentTitle }) => {
+  const [activeDocId, setActiveDocId] = useState<string>(documentId);
   const [inputText, setInputText] = useState('');
   const [zoomLevel, setZoomLevel] = useState<number>(1.0);
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
+  const [isDocPickerOpen, setIsDocPickerOpen] = useState<boolean>(false);
+  const [isCompPickerOpen, setIsCompPickerOpen] = useState<boolean>(false);
   const [modeTab, setModeTab] = useState<'single' | 'comparative'>('single');
-  const [selectedDocIds] = useState<string[]>(['VNM_2022_COMP', 'VNM_2023_COMP']);
+  const [selectedDocIds, setSelectedDocIds] = useState<string[]>(['VNM_2022_COMP', 'VNM_2023_COMP']);
   const [isDrawingEnabled, setIsDrawingEnabled] = useState<boolean>(false);
   const [annotations, setAnnotations] = useState<AuditAnnotationDTO[]>([]);
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [totalPages, setTotalPages] = useState<number>(1);
   const [pageSize, setPageSize] = useState<RenderedPageSize>({ width: 560, height: 792 });
+
+  const {
+    documents: indexedDocuments,
+    loading: docsLoading,
+    error: docsError,
+    uploading: isUploadingDoc,
+    uploadError: docUploadError,
+    refresh: refreshDocuments,
+    uploadPdf,
+  } = useDocuments();
 
   const {
     state,
@@ -70,7 +87,7 @@ export const SplitView: FC<SplitViewProps> = ({ documentId, documentTitle }) => 
     focusEvidence,
     focusFootnote,
     clearError,
-  } = useVisualRag(documentId);
+  } = useVisualRag(activeDocId);
 
   const { inferenceMode } = useSettings();
   const daemon = useDaemonLifecycle();
@@ -102,7 +119,21 @@ export const SplitView: FC<SplitViewProps> = ({ documentId, documentTitle }) => 
   const handleZoomOut = () => setZoomLevel((z) => Math.max(0.6, Math.round((z - 0.1) * 10) / 10));
   const handleZoomReset = () => setZoomLevel(1.0);
 
-  const viewedDocumentId = activeEvidence?.document_id || documentId;
+  const viewedDocumentId = activeEvidence?.document_id || activeDocId;
+
+  const handleSelectActiveDocument = (docId: string) => {
+    setActiveDocId(docId);
+    setCurrentPage(1);
+  };
+
+  const handleToggleCompDoc = (docId: string) => {
+    setSelectedDocIds((prev) => {
+      if (prev.includes(docId)) {
+        return prev.length > 2 ? prev.filter((id) => id !== docId) : prev;
+      }
+      return [...prev, docId];
+    });
+  };
 
   useEffect(() => {
     if (activeEvidence?.page_number) {
@@ -134,10 +165,25 @@ export const SplitView: FC<SplitViewProps> = ({ documentId, documentTitle }) => 
     <div className="h-full w-full flex flex-col relative bg-slate-900 border-r border-slate-800 overflow-hidden">
       <header className="h-16 border-b border-slate-800 px-4 flex items-center justify-between gap-2 flex-shrink-0">
         <div className="flex items-center space-x-2 min-w-0">
-          <FileText className="w-5 h-5 text-indigo-400 flex-shrink-0" />
-          <span className="font-semibold text-sm truncate">
-            {activeEvidence?.document_id ? `${activeEvidence.document_id} (Trích dẫn)` : documentTitle}
-          </span>
+          <button
+            type="button"
+            data-testid="btn-open-doc-picker"
+            onClick={() => {
+              refreshDocuments();
+              setIsDocPickerOpen(true);
+            }}
+            className="min-h-[48px] px-2.5 py-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-800 border border-slate-700/80 flex items-center space-x-2 min-w-0 transition cursor-pointer"
+            title="Chọn hoặc tải lên file PDF BCTC"
+          >
+            <FolderOpen className="w-4 h-4 text-indigo-400 flex-shrink-0" />
+            <span className="font-semibold text-xs sm:text-sm truncate text-slate-100">
+              {activeEvidence?.document_id
+                ? `${activeEvidence.document_id} (Trích dẫn)`
+                : activeDocId !== documentId
+                ? activeDocId
+                : documentTitle}
+            </span>
+          </button>
         </div>
 
         <div className="flex items-center space-x-2 flex-shrink-0">
@@ -369,28 +415,70 @@ export const SplitView: FC<SplitViewProps> = ({ documentId, documentTitle }) => 
 
       {/* Comparative Document Selection Chips (When in Comparative mode) */}
       {modeTab === 'comparative' && (
-        <div className="bg-slate-950/60 border-b border-slate-800/80 px-4 py-2.5 flex items-center justify-between gap-2 flex-shrink-0">
-          <div className="flex items-center gap-2 overflow-x-auto text-xs">
-            <span className="text-slate-400 font-medium text-[11px] uppercase tracking-wider shrink-0">
-              Đối chiếu:
-            </span>
-            {selectedDocIds.map((id, i) => (
-              <span
-                key={id}
-                className={`px-2.5 py-1 rounded-full text-[11px] font-mono border flex items-center gap-1 shrink-0 ${
-                  i === 0
-                    ? 'bg-sky-950/80 text-sky-300 border-sky-700/60'
-                    : 'bg-indigo-950/80 text-indigo-300 border-indigo-700/60'
-                }`}
-              >
-                <Layers className="w-3 h-3" />
-                {id}
+        <div className="bg-slate-950/60 border-b border-slate-800/80 px-4 py-2 flex flex-col gap-2 flex-shrink-0">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 overflow-x-auto text-xs">
+              <span className="text-slate-400 font-medium text-[11px] uppercase tracking-wider shrink-0">
+                Đối chiếu:
               </span>
-            ))}
+              {selectedDocIds.map((id, i) => (
+                <span
+                  key={id}
+                  className={`px-2.5 py-1 rounded-full text-[11px] font-mono border flex items-center gap-1 shrink-0 ${
+                    i === 0
+                      ? 'bg-sky-950/80 text-sky-300 border-sky-700/60'
+                      : 'bg-indigo-950/80 text-indigo-300 border-indigo-700/60'
+                  }`}
+                >
+                  <Layers className="w-3 h-3" />
+                  {id}
+                </span>
+              ))}
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <span className="text-[10px] text-emerald-400 font-medium bg-emerald-950/60 border border-emerald-800/60 px-2 py-0.5 rounded-full shrink-0">
+                {selectedDocIds.length} Tài liệu
+              </span>
+              <button
+                type="button"
+                data-testid="btn-toggle-comp-picker"
+                onClick={() => {
+                  refreshDocuments();
+                  setIsCompPickerOpen((v) => !v);
+                }}
+                className="min-h-[48px] px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs text-slate-200 font-medium transition cursor-pointer"
+              >
+                {isCompPickerOpen ? 'Xong' : 'Chọn kỳ đối chiếu'}
+              </button>
+            </div>
           </div>
-          <span className="text-[10px] text-emerald-400 font-medium bg-emerald-950/60 border border-emerald-800/60 px-2 py-0.5 rounded-full shrink-0">
-            2 Tài liệu
-          </span>
+
+          {isCompPickerOpen && (
+            <div
+              data-testid="comparative-doc-selector"
+              className="flex flex-wrap gap-1.5 pt-1 border-t border-slate-800/80"
+            >
+              {(indexedDocuments.length > 0 ? indexedDocuments : selectedDocIds).map((docId) => {
+                const checked = selectedDocIds.includes(docId);
+                return (
+                  <button
+                    key={docId}
+                    type="button"
+                    data-testid={`comp-doc-toggle-${docId}`}
+                    onClick={() => handleToggleCompDoc(docId)}
+                    className={`min-h-[48px] px-3 py-1.5 rounded-lg text-[11px] font-mono border flex items-center gap-1.5 transition cursor-pointer ${
+                      checked
+                        ? 'bg-indigo-950/90 border-indigo-500 text-indigo-200'
+                        : 'bg-slate-900 border-slate-700 text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    {checked && <Check className="w-3.5 h-3.5 text-emerald-400" />}
+                    <span>{docId}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 
@@ -772,6 +860,25 @@ export const SplitView: FC<SplitViewProps> = ({ documentId, documentTitle }) => 
       <SettingsDialog
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
+      />
+      <DocumentPickerModal
+        isOpen={isDocPickerOpen}
+        activeDocumentId={activeDocId}
+        documents={indexedDocuments}
+        isLoading={docsLoading}
+        errorMessage={docsError}
+        isUploading={isUploadingDoc}
+        uploadError={docUploadError}
+        onClose={() => setIsDocPickerOpen(false)}
+        onRetry={refreshDocuments}
+        onSelectDocument={handleSelectActiveDocument}
+        onUploadFile={async (file) => {
+          const res = await uploadPdf(file);
+          if (res?.document_id) {
+            handleSelectActiveDocument(res.document_id);
+            setIsDocPickerOpen(false);
+          }
+        }}
       />
     </div>
   );

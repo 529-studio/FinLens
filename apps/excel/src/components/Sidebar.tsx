@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useFinsightQuery } from '../lib/hooks/use-query';
+import { useDocumentList } from '../lib/hooks/use-ingest';
 import { SidebarSkeleton } from './SidebarSkeleton';
 import { DocumentUploader } from './DocumentUploader';
 import { bridge } from '../lib/bridge/client';
@@ -59,6 +60,25 @@ export const Sidebar: React.FC = () => {
     error: queryError,
     refetch,
   } = useFinsightQuery(submittedQuery, activeDoc.documentId || undefined);
+
+  const {
+    data: docListData,
+    isLoading: isDocListLoading,
+    refetch: refetchDocList,
+  } = useDocumentList();
+
+  const indexedDocs = docListData?.documents || [];
+
+  const handleSelectIndexedDoc = (docId: string) => {
+    if (!docId) return;
+    setActiveDoc({
+      documentId: docId,
+      totalPages: 2,
+      indexedVectorsCount: 2,
+      filename: `${docId}.pdf`,
+      status: 'ready',
+    });
+  };
 
   useEffect(() => {
     bridge.connect();
@@ -197,8 +217,41 @@ export const Sidebar: React.FC = () => {
             </div>
           </div>
         ) : (
-          /* Empty / Ingestion State: Document Uploader */
-          <DocumentUploader onIngestSuccess={handleIngestSuccess} />
+          /* Empty / Ingestion State: Indexed Document Selector + PDF Uploader */
+          <div className="space-y-3">
+            <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-semibold text-slate-600">
+                  Chọn nhanh BCTC đã index ({indexedDocs.length}):
+                </span>
+                <button
+                  type="button"
+                  data-testid="btn-refresh-excel-docs"
+                  onClick={() => refetchDocList()}
+                  className="min-h-[48px] px-2 text-xs text-indigo-600 hover:text-indigo-800 flex items-center gap-1 cursor-pointer"
+                  title="Làm mới danh sách BCTC"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${isDocListLoading ? 'animate-spin' : ''}`} />
+                  <span>Làm mới</span>
+                </button>
+              </div>
+              <select
+                data-testid="excel-indexed-doc-select"
+                aria-label="Chọn BCTC đã index"
+                value={activeDoc.documentId || ''}
+                onChange={(e) => handleSelectIndexedDoc(e.target.value)}
+                className="w-full min-h-[48px] px-3 py-2 text-xs border border-slate-300 rounded-lg bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              >
+                <option value="">-- Chọn BCTC có sẵn trong LanceDB --</option>
+                {indexedDocs.map((doc) => (
+                  <option key={doc.document_id} value={doc.document_id}>
+                    {doc.document_id}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <DocumentUploader onIngestSuccess={handleIngestSuccess} />
+          </div>
         )}
       </div>
 
@@ -221,7 +274,7 @@ export const Sidebar: React.FC = () => {
           <button
             type="button"
             data-testid="btn-run-query"
-            disabled={isQueryLoading || !searchQuery.trim()}
+            disabled={isQueryLoading || !searchQuery.trim() || !activeDoc.documentId}
             onClick={handleRunQuery}
             className="w-full min-h-[48px] flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 text-white px-4 py-2 rounded-lg font-medium text-sm transition shadow-sm"
           >

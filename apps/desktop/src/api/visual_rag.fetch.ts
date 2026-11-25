@@ -8,12 +8,14 @@ import {
   QueryResponseDTO,
   DocumentIngestResponseDTO,
   DocumentInfoDTO,
+  DocumentListResponseDTO,
   ComparativeQueryRequestDTO,
   ComparativeQueryResponseDTO,
 } from '../types/visual_rag.types';
 
 const BASE_URL = 'http://127.0.0.1:8765';
 const DEFAULT_TIMEOUT_MS = 25000;
+const UPLOAD_TIMEOUT_MS = 60000;
 const SAFE_DOC_ID_RE = /^[a-zA-Z0-9_\-]+$/;
 
 function validateDocId(docId: string): string {
@@ -169,6 +171,98 @@ export async function ingestDocument(
   }
 
   return (await res.json()) as DocumentIngestResponseDTO;
+}
+
+export async function fetchDocumentList(signal?: AbortSignal): Promise<DocumentListResponseDTO> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT_MS);
+
+  if (signal) {
+    signal.addEventListener('abort', () => controller.abort());
+  }
+
+  try {
+    const res = await fetch(`${BASE_URL}/api/v1/documents`, {
+      method: 'GET',
+      headers: {
+        'User-Agent': 'FinTrace-Desktop-Client/1.0',
+      },
+      signal: controller.signal,
+    });
+
+    if (!res.ok) {
+      const errBody = await res.text().catch(() => '');
+      throw new ApiError(res.status, `Không thể tải danh sách tài liệu (${res.status}): ${errBody || res.statusText}`);
+    }
+
+    return (await res.json()) as DocumentListResponseDTO;
+  } catch (err: any) {
+    if (err.name === 'AbortError') {
+      throw new ApiError(408, 'Hết thời gian tải danh sách tài liệu.');
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+export async function uploadFinancialPdf(
+  file: File,
+  renderDpi = 150,
+  documentId?: string,
+  signal?: AbortSignal
+): Promise<DocumentIngestResponseDTO> {
+  if (documentId) {
+    validateDocId(documentId);
+  }
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), UPLOAD_TIMEOUT_MS);
+
+  if (signal) {
+    signal.addEventListener('abort', () => controller.abort());
+  }
+
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('render_dpi', String(renderDpi));
+  if (documentId) {
+    formData.append('document_id', documentId);
+  }
+
+  try {
+    const res = await fetch(`${BASE_URL}/api/v1/documents/upload`, {
+      method: 'POST',
+      headers: {
+        'User-Agent': 'FinTrace-Desktop-Client/1.0',
+      },
+      body: formData,
+      signal: controller.signal,
+    });
+
+    if (!res.ok) {
+      let errMsg = `Lỗi tải lên PDF (${res.status})`;
+      try {
+        const errJson = await res.json();
+        if (errJson.detail) {
+          errMsg = typeof errJson.detail === 'string' ? errJson.detail : JSON.stringify(errJson.detail);
+        }
+      } catch {
+        const txt = await res.text().catch(() => '');
+        if (txt) errMsg = txt;
+      }
+      throw new ApiError(res.status, errMsg);
+    }
+
+    return (await res.json()) as DocumentIngestResponseDTO;
+  } catch (err: any) {
+    if (err.name === 'AbortError') {
+      throw new ApiError(408, 'Quá thời gian xử lý & render PDF (60s). Vui lòng thử lại.');
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeoutId);
+  }
 }
 
 export async function fetchComparativeQuery(

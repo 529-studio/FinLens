@@ -100,16 +100,7 @@ export async function fetchDocumentList(): Promise<{ documents: DocumentSummaryD
 
 export const fetchQueryResult = async (query: string, documentId?: string): Promise<QueryResult> => {
   if (!documentId) {
-    // If no document is selected yet, return guide mock
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve({
-          id: 'mock-guide',
-          data: `Vui lòng tải lên Báo Cáo Tài Chính (PDF) để thực hiện truy vấn "${query}".`,
-          confidence: 0.95,
-        });
-      }, 500);
-    });
+    throw new ApiError(400, 'Vui lòng chọn hoặc tải lên Báo Cáo Tài Chính (PDF) trước khi truy vấn.');
   }
 
   try {
@@ -117,7 +108,7 @@ export const fetchQueryResult = async (query: string, documentId?: string): Prom
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'User-Agent': 'FinTrace-Excel-Addin/1.0',
+        'User-Agent': 'FinTrace-Excel-Addin/1.0 (+https://529studio.site)',
       },
       body: JSON.stringify({
         document_id: documentId,
@@ -127,7 +118,8 @@ export const fetchQueryResult = async (query: string, documentId?: string): Prom
     });
 
     if (!res.ok) {
-      throw new Error(`Lỗi truy vấn: ${res.statusText}`);
+      const errBody = await res.text().catch(() => '');
+      throw new ApiError(res.status, `Lỗi truy vấn (${res.status}): ${errBody || res.statusText}`);
     }
 
     const data = await res.json();
@@ -138,10 +130,9 @@ export const fetchQueryResult = async (query: string, documentId?: string): Prom
       confidence: primaryEvidence?.confidence ?? 0.95,
     };
   } catch (err: any) {
-    return {
-      id: documentId,
-      data: `Phân tích cho "${query}": ${err.message}`,
-      confidence: 0.85,
-    };
+    if (err instanceof ApiError) {
+      throw err;
+    }
+    throw new ApiError(0, err?.message || 'Không thể kết nối đến FinTrace Core Daemon (127.0.0.1:8765)');
   }
 };

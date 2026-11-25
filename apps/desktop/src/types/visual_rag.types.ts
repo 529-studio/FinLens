@@ -90,6 +90,11 @@ export interface DocumentInfoDTO {
   available_pages: number[];
 }
 
+export interface DocumentListResponseDTO {
+  documents: string[];
+  total: number;
+}
+
 export interface RenderedPageSize {
   width: number;
   height: number;

@@ -8,7 +8,7 @@
  */
 
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { render, screen, fireEvent, cleanup } from '@testing-library/react';
+import { render, screen, fireEvent, cleanup, waitFor } from '@testing-library/react';
 import { SensitivitySlider } from '../SensitivitySlider';
 
 describe('SensitivitySlider Component', () => {
@@ -114,12 +114,13 @@ describe('SensitivitySlider Component', () => {
     });
     fireEvent.click(applyBtn);
 
-    // Give microtask tick for async handleApplyToSheet
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    await waitFor(() => {
+      expect(onRecalc).toHaveBeenCalled();
+    });
 
-    expect(onRecalc).toHaveBeenCalled();
     const resultArg = onRecalc.mock.calls[0][0];
     expect(resultArg.driverAddress).toBe('B5');
     expect(resultArg.impactedKeyMetrics.length).toBeGreaterThan(0);
+    expect(resultArg.impactedKeyMetrics[0].baseValue).toBeGreaterThan(0);
   });
 });

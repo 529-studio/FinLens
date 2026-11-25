@@ -958,6 +958,99 @@ class DocumentInfoResponse(BaseModel):
     available_pages: List[int] = Field(default_factory=list, description="Sorted 1-indexed page numbers available")
 
 
+# ============================================================================
+# Cross-Sectional Industry Peer Benchmarking Contracts (Task S13-04 / Handoff S13-01)
+# ============================================================================
+
+class BenchmarkWeightingMode(str, Enum):
+    """Weighting strategy for cross-sectional sector benchmark averages."""
+    EQUAL = "equal"
+    MARKET_CAP = "market_cap"
+
+
+class PeerQuartileStanding(str, Enum):
+    """Relative quartile standing of target company against industry peers."""
+    TOP_QUARTILE = "top_quartile"
+    ABOVE_MEDIAN = "above_median"
+    BELOW_MEDIAN = "below_median"
+    BOTTOM_QUARTILE = "bottom_quartile"
+    INSUFFICIENT_DATA = "insufficient_data"
+
+
+class PeerCompanyMetric(BaseModel):
+    """Single peer company observation for cross-sectional sector benchmarking."""
+    company_id: str = Field(..., min_length=1, max_length=64)
+    company_name: str = Field(..., min_length=1, max_length=120)
+    market_cap: Optional[float] = Field(None, ge=0.0, description="Market capitalization for cap-weighted benchmarks")
+    metrics: Dict[str, Optional[float]] = Field(default_factory=dict)
+
+
+class MetricBenchmarkConfig(BaseModel):
+    """Configuration defining metric display metadata and optimization polarity."""
+    metric_code: str = Field(..., min_length=1, max_length=64)
+    metric_name: Optional[str] = Field(None, max_length=120)
+    unit: str = Field("", max_length=16)
+    higher_is_better: bool = Field(True, description="False for leverage/cost metrics where lower is stronger")
+
+
+class PeerBenchmarkRequest(BaseModel):
+    """Request payload for cross-sectional peer benchmarking & percentile scoring."""
+    sector_name: str = Field(..., min_length=1, max_length=120)
+    target_company_id: str = Field(..., min_length=1, max_length=64)
+    target_company_name: str = Field(..., min_length=1, max_length=120)
+    target_document_id: Optional[str] = Field(None, max_length=64)
+    target_market_cap: Optional[float] = Field(None, ge=0.0)
+    target_metrics: Dict[str, Optional[float]] = Field(default_factory=dict)
+    peers: List[PeerCompanyMetric] = Field(default_factory=list, max_length=200)
+    metric_configs: List[MetricBenchmarkConfig] = Field(default_factory=list)
+    weighting_mode: BenchmarkWeightingMode = Field(BenchmarkWeightingMode.EQUAL)
+    exclude_target_from_pool: bool = Field(True)
+
+    @field_validator("target_document_id")
+    @classmethod
+    def sanitize_target_doc_id(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None:
+            if not re.match(r"^[a-zA-Z0-9_\-]+$", v) or ".." in v or len(v) > 64:
+                raise ValueError(f"Invalid or malicious target_document_id '{v}' (path traversal rejected)")
+        return v
+
+
+class MetricBenchmarkResult(BaseModel):
+    """Cross-sectional distribution statistics and percentile rank for one financial metric."""
+    metric_code: str
+    metric_name: str
+    unit: str = ""
+    higher_is_better: bool = True
+    target_value: Optional[float] = None
+    peer_count: int = Field(..., ge=0)
+    equal_weighted_mean: Optional[float] = None
+    market_cap_weighted_mean: Optional[float] = None
+    active_sector_mean: Optional[float] = None
+    p10: Optional[float] = None
+    p25: Optional[float] = None
+    p50: Optional[float] = None
+    p75: Optional[float] = None
+    p90: Optional[float] = None
+    percentile_rank: Optional[float] = Field(None, ge=0.0, le=100.0)
+    z_score: Optional[float] = None
+    standing: PeerQuartileStanding = PeerQuartileStanding.INSUFFICIENT_DATA
+
+
+class PeerBenchmarkResponse(BaseModel):
+    """Complete cross-sectional peer benchmarking report."""
+    sector_name: str
+    target_company_id: str
+    target_company_name: str
+    target_document_id: Optional[str] = None
+    weighting_mode: BenchmarkWeightingMode
+    peer_count_evaluated: int = Field(..., ge=0)
+    composite_percentile_score: Optional[float] = Field(None, ge=0.0, le=100.0)
+    results: List[MetricBenchmarkResult] = Field(default_factory=list)
+    narrative: str
+    execution_time_ms: float = Field(..., ge=0.0)
+
+
+
 
 
 

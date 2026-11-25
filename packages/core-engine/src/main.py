@@ -67,11 +67,14 @@ from contracts import (
     TenantAccessVerificationRequest,
     TenantAccessVerificationResponse,
     DocumentInfoResponse,
+    PeerBenchmarkRequest,
+    PeerBenchmarkResponse,
     is_path_safe,
 )
 from table_stitcher import TableStitcher
 from comparative_query import PortfolioSynthesisEngine
 from ratio_engine import FinancialRatioEngine
+from peer_benchmark import PeerBenchmarkEngine
 from discrepancy_detector import DiscrepancyDetector
 from audit_packager import AuditPackager
 from workspace_security import WorkspaceSecurityManager
@@ -130,6 +133,7 @@ cloud_router = CloudRouter()
 router = VlmRouter(mlx_engine=mlx_engine, cloud_router=cloud_router)
 portfolio_engine = PortfolioSynthesisEngine(store=retriever.store, retriever=retriever, router=router)
 ratio_engine = FinancialRatioEngine(store=retriever.store, retriever=retriever, router=router)
+peer_benchmark_engine = PeerBenchmarkEngine()
 discrepancy_detector = DiscrepancyDetector(retriever=retriever)
 audit_packager = AuditPackager(retriever=retriever)
 workspace_manager = WorkspaceSecurityManager()
@@ -950,6 +954,26 @@ async def analyze_financial_ratios_endpoint(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Financial ratio analysis failed: {str(e)}",
         )
+
+
+@app.post("/api/v1/analysis/peer-benchmark", response_model=PeerBenchmarkResponse)
+def peer_benchmark_endpoint(
+    req: PeerBenchmarkRequest,
+    user: User = Depends(require_permission(Permission.DOC_READ)),
+):
+    """
+    Executes cross-sectional industry peer benchmarking with equal-weighted and
+    market-cap weighted averages, linear percentiles (P10-P90), and z-scores.
+    """
+    res = peer_benchmark_engine.evaluate(req)
+    audit_logger.log_event(
+        user_id=user.user_id,
+        role=user.role.value,
+        action="PEER_BENCHMARK",
+        document_id=req.target_document_id,
+        details={"sector": req.sector_name, "weighting_mode": req.weighting_mode.value},
+    )
+    return res
 
 
 @app.post("/api/v1/audit/discrepancies", response_model=DiscrepancyAuditResponse)

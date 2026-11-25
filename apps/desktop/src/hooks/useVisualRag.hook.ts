@@ -64,7 +64,15 @@ export function useVisualRag(documentId: string) {
                   accumulated += data.token;
                   setStreamingAnswer(accumulated);
                 } else if (data.event === 'evidence' && Array.isArray(data.evidences)) {
-                  evidences = data.evidences;
+                  evidences = data.evidences.map((ev: any) => ({
+                    ...ev,
+                    bounding_box: ev.bounding_box ?? {
+                      ymin: ev.ymin ?? 0,
+                      xmin: ev.xmin ?? 0,
+                      ymax: ev.ymax ?? 1000,
+                      xmax: ev.xmax ?? 1000,
+                    },
+                  }));
                 } else if (data.event === 'footnote' && Array.isArray(data.footnotes)) {
                   footnotes = data.footnotes;
                 } else if (data.event === 'done') {

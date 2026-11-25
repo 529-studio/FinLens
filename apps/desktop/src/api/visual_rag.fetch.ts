@@ -7,12 +7,21 @@ import {
   QueryRequestDTO,
   QueryResponseDTO,
   DocumentIngestResponseDTO,
+  DocumentInfoDTO,
   ComparativeQueryRequestDTO,
   ComparativeQueryResponseDTO,
 } from '../types/visual_rag.types';
 
 const BASE_URL = 'http://127.0.0.1:8765';
 const DEFAULT_TIMEOUT_MS = 25000;
+const SAFE_DOC_ID_RE = /^[a-zA-Z0-9_\-]+$/;
+
+function validateDocId(docId: string): string {
+  if (!docId || !SAFE_DOC_ID_RE.test(docId) || docId.length > 64) {
+    throw new ApiError(400, 'Invalid document identifier');
+  }
+  return docId;
+}
 
 export class ApiError extends Error {
   constructor(
@@ -56,6 +65,85 @@ export async function fetchQuery(
   } catch (err: any) {
     if (err.name === 'AbortError') {
       throw new ApiError(408, 'Query timed out after 25s. Check engine load.');
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+export async function fetchDocumentInfo(
+  documentId: string,
+  signal?: AbortSignal
+): Promise<DocumentInfoDTO> {
+  const safeId = validateDocId(documentId);
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT_MS);
+
+  if (signal) {
+    signal.addEventListener('abort', () => controller.abort());
+  }
+
+  try {
+    const res = await fetch(`${BASE_URL}/api/v1/documents/${encodeURIComponent(safeId)}/info`, {
+      method: 'GET',
+      headers: {
+        'User-Agent': 'FinTrace-Desktop-Client/1.0',
+      },
+      signal: controller.signal,
+    });
+
+    if (!res.ok) {
+      const errBody = await res.text().catch(() => '');
+      throw new ApiError(res.status, `Không thể tải thông tin tài liệu (${res.status}): ${errBody || res.statusText}`);
+    }
+
+    return (await res.json()) as DocumentInfoDTO;
+  } catch (err: any) {
+    if (err.name === 'AbortError') {
+      throw new ApiError(408, 'Hết thời gian tải thông tin tài liệu.');
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+export async function fetchRenderedPageBlob(
+  documentId: string,
+  pageNumber: number,
+  signal?: AbortSignal
+): Promise<Blob> {
+  const safeId = validateDocId(documentId);
+  const safePage = Math.max(1, Math.floor(pageNumber));
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT_MS);
+
+  if (signal) {
+    signal.addEventListener('abort', () => controller.abort());
+  }
+
+  try {
+    const res = await fetch(
+      `${BASE_URL}/api/v1/documents/${encodeURIComponent(safeId)}/pages/${safePage}`,
+      {
+        method: 'GET',
+        headers: {
+          'User-Agent': 'FinTrace-Desktop-Client/1.0',
+        },
+        signal: controller.signal,
+      }
+    );
+
+    if (!res.ok) {
+      const errBody = await res.text().catch(() => '');
+      throw new ApiError(res.status, `Không thể tải trang ${safePage} (${res.status}): ${errBody || res.statusText}`);
+    }
+
+    return await res.blob();
+  } catch (err: any) {
+    if (err.name === 'AbortError') {
+      throw new ApiError(408, `Hết thời gian tải trang ${safePage}.`);
     }
     throw err;
   } finally {
@@ -120,4 +208,3 @@ export async function fetchComparativeQuery(
     clearTimeout(timeoutId);
   }
 }
-

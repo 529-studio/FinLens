@@ -199,8 +199,43 @@ class VlmRouter:
                 chunk_str += " "
             yield {"event": "token", "token": chunk_str}
 
+        # Normalize bounding_box structure to match GroundedEvidence DTO (ADR-003) while keeping flat keys for streaming consumers
+        normalized_evidences = []
+        for ev in evidences:
+            if "bounding_box" in ev and isinstance(ev["bounding_box"], dict):
+                bbox = ev["bounding_box"]
+                normalized_evidences.append({
+                    **ev,
+                    "ymin": bbox.get("ymin", ev.get("ymin", 0)),
+                    "xmin": bbox.get("xmin", ev.get("xmin", 0)),
+                    "ymax": bbox.get("ymax", ev.get("ymax", 1000)),
+                    "xmax": bbox.get("xmax", ev.get("xmax", 1000)),
+                })
+            else:
+                ymin = int(ev.get("ymin", 0))
+                xmin = int(ev.get("xmin", 0))
+                ymax = int(ev.get("ymax", 1000))
+                xmax = int(ev.get("xmax", 1000))
+                normalized_evidences.append({
+                    "page_number": ev.get("page_number", 1),
+                    "ymin": ymin,
+                    "xmin": xmin,
+                    "ymax": ymax,
+                    "xmax": xmax,
+                    "bounding_box": {
+                        "ymin": ymin,
+                        "xmin": xmin,
+                        "ymax": ymax,
+                        "xmax": xmax,
+                    },
+                    "label": ev.get("label", "Evidence"),
+                    "extracted_value": ev.get("extracted_value"),
+                    "confidence": float(ev.get("confidence", 0.9)),
+                    "document_id": ev.get("document_id") or document_id,
+                })
+
         # Yield visual grounding bounding box evidence
-        yield {"event": "evidence", "evidences": evidences}
+        yield {"event": "evidence", "evidences": normalized_evidences}
 
         # Yield matching footnote citations if available
         footnotes = []

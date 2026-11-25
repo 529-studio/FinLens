@@ -951,6 +951,13 @@ class TenantAccessVerificationResponse(BaseModel):
     reason: str
 
 
+class DocumentInfoResponse(BaseModel):
+    """Metadata and available rendered page numbers for an indexed document."""
+    document_id: str = Field(..., description="Sanitized alphanumeric document identifier")
+    total_pages: int = Field(..., ge=0, description="Total number of rendered/indexed pages")
+    available_pages: List[int] = Field(default_factory=list, description="Sorted 1-indexed page numbers available")
+
+
 
 
 

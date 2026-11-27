@@ -55,3 +55,6 @@ benchmarks/data/rendered_pages_sample/
 # Office.js Add-in
 *.manifest.package
 backend.log
+
+# Local Interview / Onboarding Notes
+INTERVIEW_DEFENSE.md

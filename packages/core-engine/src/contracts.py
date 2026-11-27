@@ -1050,6 +1050,97 @@ class PeerBenchmarkResponse(BaseModel):
     execution_time_ms: float = Field(..., ge=0.0)
 
 
+# ============================================================================
+# Cash Flow Direct-to-Indirect Reconciliation Contracts (Task S13-05)
+# ============================================================================
+
+class ReconciliationStatus(str, Enum):
+    """Materiality classification of Direct vs Indirect CFO reconciliation."""
+    RECONCILED = "reconciled"
+    IMMATERIAL_VARIANCE = "immaterial_variance"
+    MATERIAL_MISMATCH = "material_mismatch"
+
+
+class DirectCashFlowInput(BaseModel):
+    """Direct Method Operating Cash Flow components (signed cash flows by default)."""
+    cash_received_from_customers: float = Field(0.0, description="Cash inflows from customers")
+    cash_paid_to_suppliers: float = Field(0.0, description="Cash paid to suppliers (negative for outflow unless direct_outflows_as_positive=True)")
+    cash_paid_to_employees: float = Field(0.0, description="Cash paid to employees (negative for outflow unless direct_outflows_as_positive=True)")
+    interest_paid: float = Field(0.0, description="Interest paid (negative for outflow unless direct_outflows_as_positive=True)")
+    taxes_paid: float = Field(0.0, description="Income taxes paid (negative for outflow unless direct_outflows_as_positive=True)")
+    other_operating_cash: float = Field(0.0, description="Other net operating cash inflows/outflows")
+
+
+class IndirectCashFlowInput(BaseModel):
+    """Indirect Method Operating Cash Flow components using balance-sheet delta conventions."""
+    net_income: float = Field(0.0, description="Net income for the reporting period")
+    depreciation_amortization: float = Field(0.0, description="Non-cash depreciation & amortization add-back")
+    non_cash_adjustments: float = Field(0.0, description="Other non-cash adjustments (provisions, impairment, FX)")
+    delta_receivables: float = Field(0.0, description="Change in accounts receivable (Ending - Beginning; positive increase reduces cash)")
+    delta_inventory: float = Field(0.0, description="Change in inventory (Ending - Beginning; positive increase reduces cash)")
+    delta_payables: float = Field(0.0, description="Change in accounts payable (Ending - Beginning; positive increase provides cash)")
+    delta_other_working_capital: float = Field(0.0, description="Net cash impact of other working capital changes")
+
+
+class CashFlowReconcileRequest(BaseModel):
+    """Request payload for Direct-to-Indirect Operating Cash Flow reconciliation."""
+    document_id: str = Field(..., min_length=1, max_length=64, description="Source financial filing document ID")
+    period_label: str = Field("FY", min_length=1, max_length=64, description="Reporting period label (e.g. FY2024)")
+    direct: DirectCashFlowInput
+    indirect: IndirectCashFlowInput
+    direct_outflows_as_positive: bool = Field(
+        False,
+        description="Set True if direct outflow fields (suppliers, employees, interest, taxes) are supplied as positive magnitudes",
+    )
+    reconciliation_tolerance: float = Field(0.01, ge=0.0, description="Absolute tolerance for exact RECONCILED status")
+    materiality_threshold_pct: float = Field(1.0, ge=0.0, le=100.0, description="Percentage variance threshold for MATERIAL_MISMATCH")
+    citations: Dict[str, BoundingBox] = Field(
+        default_factory=dict,
+        description="Optional [0, 1000] bounding box visual grounding citations keyed by component name",
+    )
+    citation_pages: Dict[str, int] = Field(
+        default_factory=dict,
+        description="Optional 1-indexed PDF page numbers keyed by component name",
+    )
+
+    @field_validator("document_id")
+    @classmethod
+    def sanitize_document_id(cls, v: str) -> str:
+        if not re.match(r"^[a-zA-Z0-9_\-]+$", v) or ".." in v or len(v) > 64:
+            raise ValueError(f"Invalid or malicious document_id '{v}' (path traversal rejected)")
+        return v
+
+
+class CashFlowLineItemResult(BaseModel):
+    """Single reconciled cash flow line item with signed CFO impact and visual grounding."""
+    method: Literal["direct", "indirect"]
+    item_code: str
+    label: str
+    raw_input: float
+    cfo_impact: float
+    bounding_box: Optional[BoundingBox] = None
+    page_number: Optional[int] = Field(None, ge=1)
+
+
+class CashFlowReconcileResponse(BaseModel):
+    """Complete Direct-to-Indirect Operating Cash Flow reconciliation report."""
+    document_id: str
+    period_label: str
+    direct_cfo: float
+    indirect_cfo: float
+    reconciliation_variance: float
+    abs_variance: float = Field(..., ge=0.0)
+    variance_pct: Optional[float] = Field(None, ge=0.0)
+    status: ReconciliationStatus
+    working_capital_net_impact: float
+    non_cash_total_addback: float
+    line_items: List[CashFlowLineItemResult] = Field(default_factory=list)
+    citations: Dict[str, BoundingBox] = Field(default_factory=dict)
+    narrative: str
+    execution_time_ms: float = Field(..., ge=0.0)
+
+
+
 
 
 

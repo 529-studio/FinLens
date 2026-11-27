@@ -1140,6 +1140,59 @@ class CashFlowReconcileResponse(BaseModel):
     execution_time_ms: float = Field(..., ge=0.0)
 
 
+# ============================================================================
+# Enterprise Hierarchical RBAC Policy Contracts (Task S13-07)
+# ============================================================================
+
+class PolicyEffect(str, Enum):
+    """RBAC policy evaluation effect."""
+    ALLOW = "allow"
+    DENY = "deny"
+
+
+class RBACPolicyRuleDTO(BaseModel):
+    """Scoped RBAC policy rule supporting explicit ALLOW/DENY and glob resource matching."""
+    policy_id: str = Field(..., min_length=1, max_length=64)
+    effect: PolicyEffect
+    roles: List[str] = Field(default_factory=list)
+    permissions: List[str] = Field(default_factory=list)
+    resource_pattern: str = Field("*", min_length=1, max_length=128)
+    description: str = Field("", max_length=256)
+
+
+class RBACPolicyEvaluateRequest(BaseModel):
+    """Request payload to evaluate whether a role has permission on a scoped resource."""
+    role: str = Field(..., min_length=1, max_length=64)
+    permission: str = Field(..., min_length=1, max_length=64)
+    resource: str = Field("*", min_length=1, max_length=128)
+
+    @field_validator("resource")
+    @classmethod
+    def sanitize_resource(cls, v: str) -> str:
+        if ".." in v or "\0" in v:
+            raise ValueError("Invalid resource identifier (path traversal rejected)")
+        return v
+
+
+class RBACPolicyEvaluateResponse(BaseModel):
+    """Deterministic RBAC policy evaluation decision."""
+    allowed: bool
+    effect: PolicyEffect
+    role: str
+    permission: str
+    resource: str
+    matched_policy_id: Optional[str] = None
+    reason: str
+
+
+class RBACPoliciesListResponse(BaseModel):
+    """Active RBAC policy rules and inherited role permission matrix."""
+    total_policies: int = Field(..., ge=0)
+    policies: List[RBACPolicyRuleDTO] = Field(default_factory=list)
+    role_hierarchy: Dict[str, List[str]] = Field(default_factory=dict)
+
+
+
 
 
 

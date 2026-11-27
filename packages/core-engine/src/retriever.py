@@ -16,7 +16,8 @@ from typing import List, Tuple, Dict, Any, Optional
 import numpy as np
 from PIL import Image
 
-from store import LanceDBStore, DEFAULT_LANCEDB_DIR, DEFAULT_VECTOR_DIM
+from contracts import is_path_safe
+from store import LanceDBStore, StoreSecurityError, DEFAULT_LANCEDB_DIR, DEFAULT_VECTOR_DIM
 
 logger = logging.getLogger("finsight.retriever")
 
@@ -134,6 +135,8 @@ class ColPaliPatchEmbedder:
         grid_rows: int = PATCH_GRID_ROWS,
         grid_cols: int = PATCH_GRID_COLS,
     ):
+        if vector_dim < VISUAL_DIM + SEMANTIC_DIM:
+            raise ValueError(f"vector_dim ({vector_dim}) must be at least {VISUAL_DIM + SEMANTIC_DIM}")
         self.vector_dim = vector_dim
         self.grid_rows = grid_rows
         self.grid_cols = grid_cols
@@ -287,17 +290,17 @@ class ColPaliPatchEmbedder:
         return sem_mat
 
     def _resolve_source_pdf(self, pages: List[Tuple[int, Path, int, int]]) -> Optional[Any]:
-        """Opens source PDF once via PyMuPDF if manifest.json in the render cache points to it."""
+        """Opens source PDF once via PyMuPDF if manifest.json in the render cache points to a safe path."""
         if not pages:
             return None
         first_img = Path(pages[0][1])
         manifest_file = first_img.parent / "manifest.json"
-        if not manifest_file.exists():
+        if not manifest_file.exists() or not is_path_safe(str(manifest_file)):
             return None
         try:
             manifest = json.loads(manifest_file.read_text(encoding="utf-8"))
             pdf_path_str = manifest.get("pdf_path")
-            if pdf_path_str and Path(pdf_path_str).exists():
+            if pdf_path_str and is_path_safe(str(pdf_path_str)) and Path(pdf_path_str).exists():
                 import pymupdf
                 return pymupdf.open(pdf_path_str)
         except Exception as exc:
@@ -424,8 +427,8 @@ class VisualRetriever:
         self.store = store or LanceDBStore(db_dir=index_base_dir or DEFAULT_LANCEDB_DIR)
         self.index_base_dir = self.store.db_dir
         self.embedder = embedder or ColPaliPatchEmbedder(vector_dim=self.store.vector_dim)
-        # Fast in-memory numpy matrix cache keyed by (doc_id, page_number)
-        self._np_patch_cache: Dict[str, Dict[int, np.ndarray]] = {}
+        # Fast in-memory numpy matrix cache keyed by doc_id, guarded by store._cache_epoch
+        self._np_patch_cache: Dict[str, Tuple[int, Dict[int, np.ndarray]]] = {}
 
     def index_document(self, document_id: str, pages: List[Tuple[int, Path, int, int]]) -> int:
         """
@@ -433,6 +436,13 @@ class VisualRetriever:
         both page-level pooled vectors and multi-vector patch matrices into LanceDB.
         Returns total number of pages indexed.
         """
+        clean_id = self.store._sanitize_doc_id(document_id)
+        for _, img_path, _, _ in pages:
+            if not is_path_safe(str(img_path)):
+                raise StoreSecurityError(
+                    f"Access denied: image_path '{img_path}' escapes authorized boundaries"
+                )
+
         embeddings = self.embedder.embed_document_pages(pages)
         indexed_pages: List[Dict[str, Any]] = []
         patch_rows: List[Dict[str, Any]] = []
@@ -440,7 +450,11 @@ class VisualRetriever:
 
         for page_num, img_path, w, h in pages:
             p_path = Path(img_path)
-            file_hash = hashlib.sha256(p_path.read_bytes()).hexdigest()[:16]
+            try:
+                file_hash = hashlib.sha256(p_path.read_bytes()).hexdigest()[:16]
+            except OSError:
+                file_hash = hashlib.sha256(f"{p_path}:{page_num}".encode("utf-8")).hexdigest()[:16]
+
             patch_mat, pooled_vec = embeddings[page_num]
             np_cache_for_doc[page_num] = patch_mat
 
@@ -464,16 +478,21 @@ class VisualRetriever:
                     "vector": patch_mat[patch_idx].tolist(),
                 })
 
-        count = self.store.upsert_pages(document_id, indexed_pages)
-        self.store.upsert_page_patches(document_id, patch_rows)
-        self._np_patch_cache[document_id] = np_cache_for_doc
+        count = self.store.upsert_pages(clean_id, indexed_pages)
+        self.store.upsert_page_patches(clean_id, patch_rows)
+        self._np_patch_cache[clean_id] = (self.store._cache_epoch, np_cache_for_doc)
         return count
 
     def _get_doc_patch_matrices(self, document_id: str, page_numbers: List[int]) -> Dict[int, np.ndarray]:
-        """Loads per-page patch matrices from numpy cache or LanceDB store."""
-        cached = self._np_patch_cache.get(document_id)
-        if cached and all(p in cached for p in page_numbers):
-            return {p: cached[p] for p in page_numbers}
+        """Loads per-page patch matrices from epoch-validated numpy cache or LanceDB store."""
+        current_epoch = getattr(self.store, "_cache_epoch", 0)
+        cached_entry = self._np_patch_cache.get(document_id)
+        if cached_entry is not None:
+            cached_epoch, cached_mats = cached_entry
+            if cached_epoch == current_epoch and all(p in cached_mats for p in page_numbers):
+                return {p: cached_mats[p] for p in page_numbers}
+            if cached_epoch != current_epoch:
+                self._np_patch_cache.pop(document_id, None)
 
         raw_patches = self.store.get_page_patches(document_id, page_numbers)
         matrices: Dict[int, np.ndarray] = {}
@@ -482,7 +501,10 @@ class VisualRetriever:
                 matrices[p_num] = np.asarray(vecs, dtype=np.float32)
 
         if matrices:
-            self._np_patch_cache.setdefault(document_id, {}).update(matrices)
+            existing = self._np_patch_cache.get(document_id)
+            merged = dict(existing[1]) if existing and existing[0] == current_epoch else {}
+            merged.update(matrices)
+            self._np_patch_cache[document_id] = (current_epoch, merged)
         return matrices
 
     def search_with_scores(self, document_id: str, query: str, top_k: int = 2) -> List[Dict[str, Any]]:

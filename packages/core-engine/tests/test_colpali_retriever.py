@@ -123,10 +123,52 @@ def test_lancedb_patch_persistence_across_reconnect(tmp_path, sample_multipage_f
 def test_retriever_and_store_security_boundaries(tmp_path):
     store = LanceDBStore(db_dir=str(tmp_path / "lancedb"))
     retriever = VisualRetriever(store=store)
-    for bad_id in ["../../etc/passwd", "doc;drop", "doc\0null"]:
+    for bad_id in ["../../etc/passwd", "doc;drop", "doc\0null", "doc\nnewline"]:
         with pytest.raises(StoreSecurityError):
             retriever.search(bad_id, "financial query")
+        with pytest.raises(StoreSecurityError):
+            retriever.index_document(bad_id, [])
         with pytest.raises(StoreSecurityError):
             store.get_page_patches(bad_id)
         with pytest.raises(StoreSecurityError):
             store.search_patches(bad_id, [0.1] * DEFAULT_VECTOR_DIM)
+
+    # Unsafe image_path must be rejected before filesystem access
+    with pytest.raises(StoreSecurityError, match="escapes authorized boundaries"):
+        retriever.index_document("SAFE_DOC", [(1, Path("/etc/passwd"), 100, 100)])
+
+
+def test_retriever_edge_cases_and_cache_invalidation(tmp_path):
+    store = LanceDBStore(db_dir=str(tmp_path / "lancedb"))
+    retriever = VisualRetriever(store=store)
+
+    # 1. Empty document indexing and unindexed search
+    assert retriever.index_document("EMPTY_DOC", []) == 0
+    unindexed = retriever.search_with_scores("UNINDEXED_DOC", "any query")
+    assert unindexed[0]["page_number"] == 1
+    assert unindexed[0]["score"] == 0.0
+    assert store.get_page_patches("MISSING_DOC") == {}
+    assert store.get_page_patches("MISSING_DOC", page_numbers=[]) == {}
+
+    # 2. Missing/corrupt image paths fall back deterministically without crashing
+    missing_img = tmp_path / "nonexistent_page_1.png"
+    corrupt_img = tmp_path / "corrupt_page_2.png"
+    corrupt_img.write_text("not a valid png")
+    count = retriever.index_document("SYNTH_DOC", [
+        (1, missing_img, 100, 100),
+        (2, corrupt_img, 100, 100),
+    ])
+    assert count == 2
+    assert len(store.get_page_patches("SYNTH_DOC", page_numbers=[])) == 0
+    assert set(store.get_page_patches("SYNTH_DOC").keys()) == {1, 2}
+
+    # 3. Cache epoch invalidation when store.clear_memory_cache() or delete_document() is called
+    assert "SYNTH_DOC" in retriever._np_patch_cache
+    store.clear_memory_cache()
+    assert len(retriever.search("SYNTH_DOC", "query", top_k=2)) == 2
+    # Epoch mismatch evicted stale cache and reloaded cleanly
+    assert retriever._np_patch_cache["SYNTH_DOC"][0] == store._cache_epoch
+
+    assert store.delete_document("SYNTH_DOC") is True
+    # Searching after store.delete_document must not return stale cached pages
+    assert retriever.search("SYNTH_DOC", "query", top_k=2) == [1]

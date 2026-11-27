@@ -63,12 +63,13 @@ class LanceDBStore:
         self._patch_table = None
         self._pages_cache: Dict[str, List[Dict[str, Any]]] = {}
         self._patches_cache: Dict[str, Dict[int, Any]] = {}
+        self._cache_epoch: int = 0
 
     def _sanitize_doc_id(self, doc_id: str) -> str:
         """Sanitizes document_id and rejects injection / path traversal characters."""
         if not doc_id or "\0" in doc_id or ".." in doc_id:
             raise StoreSecurityError(f"Invalid document identifier: '{doc_id}' contains unsafe characters")
-        if not re.match(r"^[a-zA-Z0-9_\-]+$", doc_id):
+        if not re.fullmatch(r"[a-zA-Z0-9_\-]+", doc_id):
             raise StoreSecurityError(f"Invalid document identifier: '{doc_id}' must be alphanumeric with '_' or '-'")
         if len(doc_id) > 64:
             raise StoreSecurityError(f"Document identifier exceeds maximum length of 64 characters")
@@ -159,6 +160,7 @@ class LanceDBStore:
             self._table.add(rows)
 
         self._pages_cache.pop(clean_id, None)
+        self._cache_epoch += 1
         return len(rows)
 
     def upsert_page_patches(self, doc_id: str, patches: List[Dict[str, Any]]) -> int:
@@ -195,6 +197,7 @@ class LanceDBStore:
             self._patch_table.add(rows)
 
         self._patches_cache.pop(clean_id, None)
+        self._cache_epoch += 1
         return len(rows)
 
     def get_page_patches(
@@ -332,6 +335,7 @@ class LanceDBStore:
                 self._patch_table.delete(f"doc_id = '{clean_id}'")
             self._pages_cache.pop(clean_id, None)
             self._patches_cache.pop(clean_id, None)
+            self._cache_epoch += 1
             return True
         except Exception as e:
             logger.error("Failed to delete document %s: %s", clean_id, e)
@@ -341,6 +345,7 @@ class LanceDBStore:
         """Clears the in-memory document page and patch caches."""
         self._pages_cache.clear()
         self._patches_cache.clear()
+        self._cache_epoch += 1
 
     def list_documents(self) -> List[str]:
         """Returns the unique list of document identifiers currently indexed."""

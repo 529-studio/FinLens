@@ -17,6 +17,7 @@ import { ResizableSplitView } from './ResizableSplitView';
 import { BoundingBoxOverlay } from '../pdf/BoundingBoxOverlay';
 import { AnnotationCanvas } from '../pdf/AnnotationCanvas';
 import { PdfViewer } from '../pdf/PdfViewer';
+import { TabbedSplitViewer, type OpenPdfTab } from '../pdf/TabbedSplitViewer';
 import { DocumentPickerModal } from '../pdf/DocumentPickerModal';
 import { SettingsDialog } from '../settings/SettingsDialog';
 import { FootnoteChip } from '../chat/FootnoteChip';
@@ -43,6 +44,7 @@ import {
   ChevronRight,
   FolderOpen,
   Check,
+  Columns2,
 } from 'lucide-react';
 
 interface SplitViewProps {
@@ -60,6 +62,8 @@ export const SplitView: FC<SplitViewProps> = ({ documentId, documentTitle }) => 
   const [modeTab, setModeTab] = useState<'single' | 'comparative'>('single');
   const [selectedDocIds, setSelectedDocIds] = useState<string[]>(['VNM_2022_COMP', 'VNM_2023_COMP']);
   const [isDrawingEnabled, setIsDrawingEnabled] = useState<boolean>(false);
+  const [isSplitPdfMode, setIsSplitPdfMode] = useState<boolean>(false);
+  const [paneBDocId, setPaneBDocId] = useState<string | null>(null);
   const [annotations, setAnnotations] = useState<AuditAnnotationDTO[]>([]);
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [totalPages, setTotalPages] = useState<number>(1);
@@ -179,6 +183,22 @@ export const SplitView: FC<SplitViewProps> = ({ documentId, documentTitle }) => 
     setPageSize(size);
   }, []);
 
+  const showTabbedSplit = modeTab === 'comparative' || isSplitPdfMode;
+  const openPdfTabs: OpenPdfTab[] = (() => {
+    const ids = Array.from(
+      new Set([
+        activeDocId,
+        ...selectedDocIds,
+        ...indexedDocuments,
+      ])
+    ).filter(Boolean);
+    return ids.map((id) => ({
+      documentId: id,
+      title: id === documentId ? documentTitle : `PDF · ${id}`,
+      totalPages: id === activeDocId ? totalPages : undefined,
+    }));
+  })();
+
   const leftPaneContent = (
     <div className="h-full w-full flex flex-col relative bg-slate-900 border-r border-slate-800 overflow-hidden">
       <header className="h-16 border-b border-slate-800 px-4 flex items-center justify-between gap-2 flex-shrink-0">
@@ -269,6 +289,21 @@ export const SplitView: FC<SplitViewProps> = ({ documentId, documentTitle }) => 
 
           <button
             type="button"
+            onClick={() => setIsSplitPdfMode((v) => !v)}
+            data-testid="toggle-tabbed-split-btn"
+            className={`min-h-[48px] px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition-colors cursor-pointer ${
+              showTabbedSplit
+                ? 'bg-sky-600 text-white shadow-md'
+                : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
+            }`}
+            title="Bật/Tắt chia đôi xem nhiều PDF song song"
+          >
+            <Columns2 className="w-3.5 h-3.5" />
+            <span>Chia đôi PDF</span>
+          </button>
+
+          <button
+            type="button"
             onClick={() => setIsDrawingEnabled((v) => !v)}
             data-testid="toggle-annotation-mode-btn"
             className={`min-h-[48px] px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition-colors cursor-pointer ${
@@ -284,61 +319,83 @@ export const SplitView: FC<SplitViewProps> = ({ documentId, documentTitle }) => 
         </div>
       </header>
 
-      {activeEvidence && (
-        <div className="border-b border-slate-800/80 bg-indigo-950/30 px-4 py-1.5 flex items-center space-x-2 text-xs text-indigo-300 flex-shrink-0">
-          <Eye className="w-3.5 h-3.5 text-indigo-400 flex-shrink-0" />
-          <span className="truncate">
-            {activeEvidence.document_id ? `[${activeEvidence.document_id}] ` : ''}Trang {activeEvidence.page_number}: {activeEvidence.label}
-          </span>
+      {showTabbedSplit ? (
+        <div className="flex-1 min-h-0 overflow-hidden">
+          <TabbedSplitViewer
+            openTabs={openPdfTabs}
+            paneADocId={selectedDocIds[0] && modeTab === 'comparative' ? selectedDocIds[0] : activeDocId}
+            paneBDocId={
+              paneBDocId ||
+              (modeTab === 'comparative' ? selectedDocIds[1] || null : openPdfTabs[1]?.documentId || null)
+            }
+            activeEvidence={activeEvidence}
+            onSelectPaneADoc={handleSelectActiveDocument}
+            onSelectPaneBDoc={(id) => setPaneBDocId(id)}
+            onOpenDocumentPicker={() => {
+              refreshDocuments();
+              setIsDocPickerOpen(true);
+            }}
+          />
         </div>
-      )}
+      ) : (
+        <>
+          {activeEvidence && (
+            <div className="border-b border-slate-800/80 bg-indigo-950/30 px-4 py-1.5 flex items-center space-x-2 text-xs text-indigo-300 flex-shrink-0">
+              <Eye className="w-3.5 h-3.5 text-indigo-400 flex-shrink-0" />
+              <span className="truncate">
+                {activeEvidence.document_id ? `[${activeEvidence.document_id}] ` : ''}Trang {activeEvidence.page_number}: {activeEvidence.label}
+              </span>
+            </div>
+          )}
 
-      <div className="flex-1 relative overflow-auto p-6 flex justify-center items-start bg-slate-950/50">
-        <div className="relative shadow-2xl overflow-visible flex-shrink-0 my-auto">
-          <PdfViewer
-            documentId={viewedDocumentId}
-            pageNumber={currentPage}
-            zoomLevel={zoomLevel}
-            onPageRendered={handlePageRendered}
-          />
-          <BoundingBoxOverlay
-            evidence={activeEvidence && activeEvidence.page_number === currentPage ? activeEvidence : null}
-            renderedWidth={pageSize.width}
-            renderedHeight={pageSize.height}
-            zoomLevel={zoomLevel}
-          />
-          <AnnotationCanvas
-            documentId={viewedDocumentId}
-            pageNumber={currentPage}
-            renderedWidth={pageSize.width}
-            renderedHeight={pageSize.height}
-            zoomLevel={zoomLevel}
-            annotations={annotations}
-            isDrawingEnabled={isDrawingEnabled}
-            onAddAnnotation={(newAnn) => {
-              const created: AuditAnnotationDTO = {
-                ...newAnn,
-                annotation_id: `ann-${Date.now()}`,
-                created_at: Math.floor(Date.now() / 1000),
-                resolved: false,
-              };
-              setAnnotations((prev) => [...prev, created]);
-            }}
-            onResolveAnnotation={(id) => {
-              setAnnotations((prev) =>
-                prev.map((a) =>
-                  a.annotation_id === id
-                    ? { ...a, resolved: !a.resolved, resolved_by: 'Kiểm toán viên' }
-                    : a
-                )
-              );
-            }}
-            onDeleteAnnotation={(id) => {
-              setAnnotations((prev) => prev.filter((a) => a.annotation_id !== id));
-            }}
-          />
-        </div>
-      </div>
+          <div className="flex-1 relative overflow-auto p-6 flex justify-center items-start bg-slate-950/50">
+            <div className="relative shadow-2xl overflow-visible flex-shrink-0 my-auto">
+              <PdfViewer
+                documentId={viewedDocumentId}
+                pageNumber={currentPage}
+                zoomLevel={zoomLevel}
+                onPageRendered={handlePageRendered}
+              />
+              <BoundingBoxOverlay
+                evidence={activeEvidence && activeEvidence.page_number === currentPage ? activeEvidence : null}
+                renderedWidth={pageSize.width}
+                renderedHeight={pageSize.height}
+                zoomLevel={zoomLevel}
+              />
+              <AnnotationCanvas
+                documentId={viewedDocumentId}
+                pageNumber={currentPage}
+                renderedWidth={pageSize.width}
+                renderedHeight={pageSize.height}
+                zoomLevel={zoomLevel}
+                annotations={annotations}
+                isDrawingEnabled={isDrawingEnabled}
+                onAddAnnotation={(newAnn) => {
+                  const created: AuditAnnotationDTO = {
+                    ...newAnn,
+                    annotation_id: `ann-${Date.now()}`,
+                    created_at: Math.floor(Date.now() / 1000),
+                    resolved: false,
+                  };
+                  setAnnotations((prev) => [...prev, created]);
+                }}
+                onResolveAnnotation={(id) => {
+                  setAnnotations((prev) =>
+                    prev.map((a) =>
+                      a.annotation_id === id
+                        ? { ...a, resolved: !a.resolved, resolved_by: 'Kiểm toán viên' }
+                        : a
+                    )
+                  );
+                }}
+                onDeleteAnnotation={(id) => {
+                  setAnnotations((prev) => prev.filter((a) => a.annotation_id !== id));
+                }}
+              />
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 

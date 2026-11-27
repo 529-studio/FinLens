@@ -7,8 +7,11 @@ Governed by ADR-002, ADR-003, and AGENTS.md Rule 13:
 """
 
 import os
+import asyncio
+import functools
 import logging
-from typing import Dict, Any, List, Tuple, Optional
+from concurrent.futures import ThreadPoolExecutor
+from typing import Dict, Any, List, Tuple, Optional, Callable
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -24,10 +27,42 @@ logger = logging.getLogger("finsight.vlm_router")
 
 
 class VlmRouter:
-    def __init__(self, mlx_engine: MLXEngine = None, cloud_router: CloudRouter = None):
+    def __init__(
+        self,
+        mlx_engine: MLXEngine = None,
+        cloud_router: CloudRouter = None,
+        mlx_executor: Optional[ThreadPoolExecutor] = None,
+    ):
         self.default_mode = os.getenv("FINSIGHT_INFERENCE_MODE", "auto")
         self.mlx_engine = mlx_engine or MLXEngine()
         self.cloud_router = cloud_router or CloudRouter()
+        self._owns_executor = mlx_executor is None
+        self._mlx_executor = mlx_executor or ThreadPoolExecutor(
+            max_workers=1,
+            thread_name_prefix="mlx-inference",
+        )
+
+    def shutdown(self, wait: bool = False) -> None:
+        """Shuts down the dedicated MLX inference worker if owned by this router."""
+        if self._owns_executor and self._mlx_executor is not None:
+            self._mlx_executor.shutdown(wait=wait)
+            self._mlx_executor = None
+
+    async def _run_mlx_offloaded(self, fn: Callable[..., Any], *args: Any, **kwargs: Any) -> Any:
+        """
+        Offloads synchronous MLXEngine work onto a dedicated 1-worker thread executor
+        so the FastAPI asyncio event loop (/health, WebSockets) never stalls while
+        keeping Metal unified memory access strictly serialized.
+        """
+        if self._mlx_executor is None:
+            self._mlx_executor = ThreadPoolExecutor(
+                max_workers=1,
+                thread_name_prefix="mlx-inference",
+            )
+            self._owns_executor = True
+        loop = asyncio.get_running_loop()
+        call = functools.partial(fn, *args, **kwargs)
+        return await loop.run_in_executor(self._mlx_executor, call)
 
     def detect_hardware_capability(self) -> str:
         """Detects whether local Apple Silicon or CUDA is available."""
@@ -52,7 +87,7 @@ class VlmRouter:
             mode = "local" if hw == "mlx_apple_silicon" else "cloud"
 
         if mode == "local":
-            return self.mlx_engine.analyze_pages(pages, query)
+            return await self._run_mlx_offloaded(self.mlx_engine.analyze_pages, pages, query)
         else:
             return await self.cloud_router.analyze_pages(pages, query)
 
@@ -72,7 +107,7 @@ class VlmRouter:
             mode = "local" if hw == "mlx_apple_silicon" else "cloud"
 
         if mode == "local":
-            return self.mlx_engine.analyze_comparative(doc_pages, query)
+            return await self._run_mlx_offloaded(self.mlx_engine.analyze_comparative, doc_pages, query)
         else:
             return await self.cloud_router.analyze_comparative(doc_pages, query)
 
@@ -91,7 +126,7 @@ class VlmRouter:
 
     async def _infer_local_mlx(self, image_path: str, page_number: int, query: str) -> Dict[str, Any]:
         """Local MLX inference with normalized coordinates (0-1000 scale)."""
-        return self.mlx_engine.analyze_page(image_path, page_number, query)
+        return await self._run_mlx_offloaded(self.mlx_engine.analyze_page, image_path, page_number, query)
 
     async def _infer_cloud_litellm(self, image_path: str, page_number: int, query: str) -> Dict[str, Any]:
         """Cloud LiteLLM adapter (Claude 3.5 Sonnet / Azure OpenAI)."""
@@ -198,6 +233,7 @@ class VlmRouter:
             if i + chunk_words_count < len(words):
                 chunk_str += " "
             yield {"event": "token", "token": chunk_str}
+            await asyncio.sleep(0)
 
         # Normalize bounding_box structure to match GroundedEvidence DTO (ADR-003) while keeping flat keys for streaming consumers
         normalized_evidences = []

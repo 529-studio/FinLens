@@ -519,19 +519,25 @@ class VisualRetriever:
         query_vecs = self.embedder.embed_query(query)
         pooled_q = self.embedder.pool_query(query_vecs)
 
-        # Stage 1: LanceDB ANN vector search across page vectors and patch vectors
-        candidate_limit = max(top_k * 16, 48)
-        ann_pages = self.store.search(document_id, pooled_q.tolist(), top_k=candidate_limit)
-        ann_patches = self.store.search_patches(document_id, pooled_q.tolist(), top_k=candidate_limit * 2)
+        # Stage 1: LanceDB ANN vector search for large documents (>100 pages) or cold cache
+        current_epoch = getattr(self.store, "_cache_epoch", 0)
+        cached_entry = self._np_patch_cache.get(document_id)
+        cache_warm = cached_entry is not None and cached_entry[0] == current_epoch
 
-        candidate_set = {int(r["page_number"]) for r in ann_pages}
-        candidate_set.update(int(r["page_number"]) for r in ann_patches)
-
-        # For small-to-medium documents (<= 100 pages), ensure full recall during MaxSim re-ranking
-        if len(pages) <= 100 or not candidate_set:
+        if len(pages) <= 100 and cache_warm:
             candidate_nums = [int(p["page_number"]) for p in pages]
         else:
-            candidate_nums = sorted(candidate_set)
+            candidate_limit = max(top_k * 16, 48)
+            ann_pages = self.store.search(document_id, pooled_q.tolist(), top_k=candidate_limit)
+            ann_patches = self.store.search_patches(document_id, pooled_q.tolist(), top_k=candidate_limit * 2)
+
+            candidate_set = {int(r["page_number"]) for r in ann_pages}
+            candidate_set.update(int(r["page_number"]) for r in ann_patches)
+
+            if len(pages) <= 100 or not candidate_set:
+                candidate_nums = [int(p["page_number"]) for p in pages]
+            else:
+                candidate_nums = sorted(candidate_set)
 
         # Stage 2: Late-Interaction MaxSim over stored page patch tensors
         patch_matrices = self._get_doc_patch_matrices(document_id, candidate_nums)

@@ -51,6 +51,7 @@ benchmarks/data/rendered_pages_sample/
 
 # Testing & Tooling
 .playwright-mcp/
+docs/real_pdfs/
 
 # Office.js Add-in
 *.manifest.package

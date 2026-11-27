@@ -28,6 +28,7 @@ logger = logging.getLogger("finsight.store")
 
 DEFAULT_LANCEDB_DIR = os.getenv("FINSIGHT_LANCEDB_DIR", "~/.finsight/lancedb")
 TABLE_NAME = "document_pages"
+PATCH_TABLE_NAME = "document_patches"
 DEFAULT_VECTOR_DIM = 128
 
 
@@ -59,7 +60,9 @@ class LanceDBStore:
         self.db_dir.mkdir(parents=True, exist_ok=True)
         self._db = None
         self._table = None
+        self._patch_table = None
         self._pages_cache: Dict[str, List[Dict[str, Any]]] = {}
+        self._patches_cache: Dict[str, Dict[int, Any]] = {}
 
     def _sanitize_doc_id(self, doc_id: str) -> str:
         """Sanitizes document_id and rejects injection / path traversal characters."""
@@ -100,8 +103,20 @@ class LanceDBStore:
                 ])
                 self._table = self._db.create_table(TABLE_NAME, schema=schema)
 
+            if PATCH_TABLE_NAME in existing_tables:
+                self._patch_table = self._db.open_table(PATCH_TABLE_NAME)
+            else:
+                patch_schema = pa.schema([
+                    pa.field("doc_id", pa.string()),
+                    pa.field("page_number", pa.int32()),
+                    pa.field("patch_index", pa.int32()),
+                    pa.field("vector", pa.list_(pa.float32(), self.vector_dim)),
+                    pa.field("indexed_at", pa.float64()),
+                ])
+                self._patch_table = self._db.create_table(PATCH_TABLE_NAME, schema=patch_schema)
+
     def _ensure_connected(self):
-        if self._table is None:
+        if self._table is None or self._patch_table is None:
             self.connect()
 
     def upsert_pages(self, doc_id: str, pages: List[Dict[str, Any]]) -> int:
@@ -145,6 +160,103 @@ class LanceDBStore:
 
         self._pages_cache.pop(clean_id, None)
         return len(rows)
+
+    def upsert_page_patches(self, doc_id: str, patches: List[Dict[str, Any]]) -> int:
+        """
+        Idempotently persists multi-vector visual patch embeddings for a document in LanceDB.
+        Each item expects: page_number (int), patch_index (int), vector (List[float] of length vector_dim).
+        """
+        clean_id = self._sanitize_doc_id(doc_id)
+        self._ensure_connected()
+
+        try:
+            self._patch_table.delete(f"doc_id = '{clean_id}'")
+        except Exception as e:
+            logger.debug("Delete prior patches for %s returned: %s", clean_id, e)
+
+        rows = []
+        now = time.time()
+        for p in patches:
+            vec = p.get("vector")
+            if vec is None:
+                continue
+            vec_list = [float(v) for v in vec[:self.vector_dim]]
+            if len(vec_list) < self.vector_dim:
+                vec_list.extend([0.0] * (self.vector_dim - len(vec_list)))
+            rows.append({
+                "doc_id": clean_id,
+                "page_number": int(p["page_number"]),
+                "patch_index": int(p.get("patch_index", 0)),
+                "vector": vec_list,
+                "indexed_at": float(now),
+            })
+
+        if rows:
+            self._patch_table.add(rows)
+
+        self._patches_cache.pop(clean_id, None)
+        return len(rows)
+
+    def get_page_patches(
+        self,
+        doc_id: str,
+        page_numbers: Optional[List[int]] = None,
+    ) -> Dict[int, List[List[float]]]:
+        """
+        Retrieves stored multi-vector patch lists keyed by 1-indexed page_number.
+        Uses in-memory cache per document for sub-millisecond MaxSim scoring.
+        """
+        clean_id = self._sanitize_doc_id(doc_id)
+        if clean_id not in self._patches_cache:
+            self._ensure_connected()
+            try:
+                rows = (
+                    self._patch_table.search()
+                    .where(f"doc_id = '{clean_id}'")
+                    .limit(100000)
+                    .to_list()
+                )
+            except Exception as e:
+                logger.error("Failed to query patches for %s: %s", clean_id, e)
+                rows = []
+
+            grouped: Dict[int, List[tuple]] = {}
+            for r in rows:
+                p_num = int(r["page_number"])
+                grouped.setdefault(p_num, []).append((int(r["patch_index"]), r["vector"]))
+
+            ordered: Dict[int, List[List[float]]] = {}
+            for p_num, items in grouped.items():
+                items.sort(key=lambda x: x[0])
+                ordered[p_num] = [vec for _, vec in items]
+            self._patches_cache[clean_id] = ordered
+
+        cached_doc = self._patches_cache[clean_id]
+        if page_numbers is None:
+            return cached_doc
+        return {p: cached_doc[p] for p in page_numbers if p in cached_doc}
+
+    def search_patches(self, doc_id: str, query_vector: List[float], top_k: int = 32) -> List[Dict[str, Any]]:
+        """
+        Executes LanceDB nearest-neighbor search across individual visual patch vectors
+        scoped to a specific document.
+        """
+        clean_id = self._sanitize_doc_id(doc_id)
+        self._ensure_connected()
+
+        try:
+            vec = [float(v) for v in query_vector[:self.vector_dim]]
+            if len(vec) < self.vector_dim:
+                vec.extend([0.0] * (self.vector_dim - len(vec)))
+            return (
+                self._patch_table.search(vec)
+                .where(f"doc_id = '{clean_id}'")
+                .limit(top_k)
+                .to_list()
+            )
+        except Exception as e:
+            logger.error("Patch vector search failed for %s: %s", clean_id, e)
+            return []
 
     def get_pages(self, doc_id: str) -> List[Dict[str, Any]]:
         """Retrieves all indexed pages for a given document, sorted by page_number (cached in-memory)."""
@@ -216,15 +328,19 @@ class LanceDBStore:
 
         try:
             self._table.delete(f"doc_id = '{clean_id}'")
+            if self._patch_table is not None:
+                self._patch_table.delete(f"doc_id = '{clean_id}'")
             self._pages_cache.pop(clean_id, None)
+            self._patches_cache.pop(clean_id, None)
             return True
         except Exception as e:
             logger.error("Failed to delete document %s: %s", clean_id, e)
             return False
 
     def clear_memory_cache(self) -> None:
-        """Clears the in-memory document page cache."""
+        """Clears the in-memory document page and patch caches."""
         self._pages_cache.clear()
+        self._patches_cache.clear()
 
     def list_documents(self) -> List[str]:
         """Returns the unique list of document identifiers currently indexed."""

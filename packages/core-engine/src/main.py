@@ -71,6 +71,9 @@ from contracts import (
     PeerBenchmarkResponse,
     CashFlowReconcileRequest,
     CashFlowReconcileResponse,
+    RBACPolicyEvaluateRequest,
+    RBACPolicyEvaluateResponse,
+    RBACPoliciesListResponse,
     is_path_safe,
 )
 from table_stitcher import TableStitcher
@@ -78,6 +81,7 @@ from comparative_query import PortfolioSynthesisEngine
 from ratio_engine import FinancialRatioEngine
 from peer_benchmark import PeerBenchmarkEngine
 from cashflow_reconciler import CashFlowReconciler
+from rbac_policy import HierarchicalRBACEngine
 from discrepancy_detector import DiscrepancyDetector
 from audit_packager import AuditPackager
 from workspace_security import WorkspaceSecurityManager
@@ -138,6 +142,7 @@ portfolio_engine = PortfolioSynthesisEngine(store=retriever.store, retriever=ret
 ratio_engine = FinancialRatioEngine(store=retriever.store, retriever=retriever, router=router)
 peer_benchmark_engine = PeerBenchmarkEngine()
 cashflow_reconciler = CashFlowReconciler()
+rbac_engine = HierarchicalRBACEngine()
 discrepancy_detector = DiscrepancyDetector(retriever=retriever)
 audit_packager = AuditPackager(retriever=retriever)
 workspace_manager = WorkspaceSecurityManager()
@@ -162,32 +167,33 @@ def health_check():
 @app.post("/api/v1/auth/login", response_model=LoginResponse)
 def login_user(req: LoginRequest):
     """
-    Authenticates a user and issues an enterprise HS256 JWT access token.
-    Enforces role assignment and records an audit log event.
+    Authenticates a user against salted PBKDF2-HMAC-SHA256 credential store (fail-closed)
+    and issues an enterprise HS256 JWT access token.
     """
-    role_map = {
-        "admin": Role.ADMIN,
-        "senior_auditor": Role.SENIOR_AUDITOR,
-        "junior_analyst": Role.JUNIOR_ANALYST,
-        "read_only": Role.READ_ONLY_REVIEWER,
-        "reviewer": Role.READ_ONLY_REVIEWER,
-    }
-    user_role = req.role or role_map.get(req.username.lower(), Role.JUNIOR_ANALYST)
-
-    # Basic credential security validation
-    if req.password == "invalid_secret" or len(req.password) < 4:
+    ok, resolved_role, reason = rbac_engine.authenticate(
+        username=req.username,
+        password=req.password,
+        requested_role=req.role,
+    )
+    if not ok or resolved_role is None:
         audit_logger.log_event(
             user_id=req.username,
             role="unauthenticated",
             action="AUTH_LOGIN_FAILED",
-            details={"reason": "invalid_credentials"},
+            details={"reason": reason},
         )
+        if reason == "privilege_escalation_denied":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied: requested role exceeds assigned privilege level",
+            )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid credentials: username or password rejected",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
+    user_role = resolved_role
     token = create_access_token(user_id=req.username, role=user_role, name=req.username.title())
     user = User(
         user_id=req.username,
@@ -209,6 +215,47 @@ def login_user(req: LoginRequest):
         expires_in_seconds=28800,
         user=user,
     )
+
+
+@app.post("/api/v1/rbac/evaluate", response_model=RBACPolicyEvaluateResponse)
+def evaluate_rbac_policy(
+    req: RBACPolicyEvaluateRequest,
+    user: User = Depends(require_permission(Permission.DOC_READ)),
+):
+    """
+    Evaluates hierarchical RBAC permissions and explicit ALLOW/DENY policies
+    (with deny-takes-precedence) for a target role, permission, and resource scope.
+    """
+    try:
+        res = rbac_engine.evaluate(req)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
+    audit_logger.log_event(
+        user_id=user.user_id,
+        role=user.role.value,
+        action="RBAC_POLICY_EVALUATE",
+        details={
+            "target_role": req.role,
+            "permission": req.permission,
+            "resource": req.resource,
+            "allowed": res.allowed,
+        },
+    )
+    return res
+
+
+@app.get("/api/v1/rbac/policies", response_model=RBACPoliciesListResponse)
+def list_rbac_policies(
+    user: User = Depends(require_permission(Permission.AUDIT_READ)),
+):
+    """Lists active scoped RBAC policies and inherited role permission hierarchy."""
+    audit_logger.log_event(
+        user_id=user.user_id,
+        role=user.role.value,
+        action="RBAC_POLICIES_LIST",
+        details={},
+    )
+    return rbac_engine.list_policies()
 
 
 @app.get("/api/v1/auth/me", response_model=User)

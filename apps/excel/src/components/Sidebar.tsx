@@ -8,6 +8,7 @@ import { DocumentIngestResponseDTO, ActiveDocumentState, FinancialTableData } fr
 import { insertFinancialTableToSheet, insertCellAuditComment } from '../lib/excel/table-export';
 import { SensitivitySlider } from './SensitivitySlider';
 import { WaterfallChart } from './WaterfallChart';
+import { TornadoChart } from './TornadoChart';
 import { AuditedCellDrawer, type AuditedCellData } from './AuditedCellDrawer';
 import {
   RefreshCw,
@@ -459,6 +460,14 @@ export const Sidebar: React.FC = () => {
             <span>{auditNoteNotice}</span>
           </div>
         )}
+      </div>
+
+      {/* Live Formula Dependency Visualizer & Sensitivity Tornado Chart Section */}
+      <div className="space-y-3 pt-3 border-t border-slate-200">
+        <label className="text-xs font-semibold uppercase tracking-wider text-slate-500 block">
+          6. Biểu Đồ Tornado & Chuỗi Phụ Thuộc Công Thức
+        </label>
+        <TornadoChart />
       </div>
     </div>
   );

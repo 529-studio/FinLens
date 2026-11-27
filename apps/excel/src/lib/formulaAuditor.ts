@@ -765,3 +765,88 @@ export async function updateWorksheetCellValue(
   // Graceful fallback when Office.js is not present (browser/test)
   return { success: true, address: norm, value };
 }
+
+// ---------------------------------------------------------------------------
+// One-at-a-Time (OAT) Tornado Sensitivity Analysis (Sprint 13 S13-08)
+// ---------------------------------------------------------------------------
+
+export interface TornadoDriverInput {
+  address: string;
+  label: string;
+  swingPct?: number;
+}
+
+export interface TornadoBarResult {
+  address: string;
+  label: string;
+  baseDriverValue: number;
+  lowDriverValue: number;
+  highDriverValue: number;
+  baseTargetValue: number;
+  lowTargetValue: number;
+  highTargetValue: number;
+  lowDelta: number;
+  highDelta: number;
+  spread: number;
+  precedents: string[];
+  dependents: string[];
+  formula?: string;
+}
+
+/**
+ * Computes One-at-a-Time (OAT) Tornado sensitivity swings for a set of driver cells
+ * against a target KPI cell using deterministic zero-eval AST evaluation,
+ * sorted descending by absolute impact spread (max - min).
+ */
+export function computeTornadoSensitivity(
+  drivers: TornadoDriverInput[],
+  targetAddress: string,
+  graph: DependencyGraph,
+  baseValues: Record<string, number>,
+  defaultSwingPct: number = 10
+): TornadoBarResult[] {
+  if (!drivers || drivers.length === 0) return [];
+
+  const normTarget = normalizeAddress(targetAddress);
+  const baseTargetValue = baseValues[normTarget] ?? 0;
+
+  const results: TornadoBarResult[] = drivers.map((driver) => {
+    const normDriver = normalizeAddress(driver.address);
+    const pct = Math.max(0.1, driver.swingPct ?? defaultSwingPct);
+    const baseDriverValue = baseValues[normDriver] ?? 0;
+    const step = Math.abs(baseDriverValue) * (pct / 100);
+    const lowDriverValue = baseDriverValue - step;
+    const highDriverValue = baseDriverValue + step;
+
+    const lowRecalc = recalculateModel(normDriver, lowDriverValue, graph, baseValues);
+    const highRecalc = recalculateModel(normDriver, highDriverValue, graph, baseValues);
+
+    const lowTargetValue = lowRecalc[normTarget] ?? baseTargetValue;
+    const highTargetValue = highRecalc[normTarget] ?? baseTargetValue;
+
+    const lowDelta = lowTargetValue - baseTargetValue;
+    const highDelta = highTargetValue - baseTargetValue;
+    const spread = Math.abs(highTargetValue - lowTargetValue);
+
+    const driverNode = graph.nodes.get(normDriver);
+
+    return {
+      address: normDriver,
+      label: driver.label,
+      baseDriverValue,
+      lowDriverValue,
+      highDriverValue,
+      baseTargetValue,
+      lowTargetValue,
+      highTargetValue,
+      lowDelta,
+      highDelta,
+      spread,
+      precedents: driverNode?.precedents ?? [],
+      dependents: driverNode?.dependents ?? [],
+      formula: driverNode?.formula,
+    };
+  });
+
+  return results.sort((a, b) => b.spread - a.spread);
+}

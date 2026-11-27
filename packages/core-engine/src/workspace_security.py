@@ -7,7 +7,6 @@ atomic POSIX permission enforcement (0o700 directories, 0o600 files), and cross-
 
 import base64
 import hashlib
-import hmac
 import json
 import os
 import re
@@ -16,6 +15,9 @@ import stat
 import time
 from pathlib import Path
 from typing import Dict, Any, Optional, Set
+
+from cryptography.exceptions import InvalidTag
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
 from contracts import (
     WorkspaceTier,
@@ -47,29 +49,17 @@ def encrypt_data_at_rest(
     associated_data: Optional[bytes] = None,
 ) -> Dict[str, str]:
     """
-    Performs authenticated symmetric encryption at rest (AES-256-GCM authenticated cipher equivalent).
-    Constructs an Encrypt-then-MAC stream with a 96-bit cryptographic nonce and 128-bit authentication tag.
+    Performs hardware-accelerated NIST SP 800-38D AES-256-GCM authenticated encryption at rest.
+    Uses a 256-bit key, fresh 96-bit CSPRNG nonce, and 128-bit GCM authentication tag.
     """
     if len(key) < 32:
         raise ValueError("Encryption key must be at least 32 bytes (256 bits)")
 
-    enc_key = key[:16]
-    mac_key = key[16:]
     nonce = secrets.token_bytes(12)  # 96-bit nonce
-
-    # Generate keystream blocks
-    block_count = (len(plaintext) + 31) // 32
-    keystream = bytearray()
-    for i in range(block_count):
-        block = hmac.new(enc_key, nonce + i.to_bytes(4, "big"), hashlib.sha256).digest()
-        keystream.extend(block)
-
-    ciphertext = bytes(p ^ k for p, k in zip(plaintext, keystream[:len(plaintext)]))
-
-    # Authenticate: MAC over associated data + nonce + ciphertext
-    aad = associated_data or b""
-    mac_input = aad + nonce + ciphertext
-    tag = hmac.new(mac_key, mac_input, hashlib.sha256).digest()[:16]  # 128-bit tag
+    aesgcm = AESGCM(key[:32])
+    ct_and_tag = aesgcm.encrypt(nonce, plaintext, associated_data)
+    ciphertext = ct_and_tag[:-16]
+    tag = ct_and_tag[-16:]  # 128-bit GCM tag
 
     return {
         "ciphertext": base64.b64encode(ciphertext).decode("utf-8"),
@@ -86,38 +76,29 @@ def decrypt_data_at_rest(
     associated_data: Optional[bytes] = None,
 ) -> bytes:
     """
-    Performs authenticated decryption with tamper detection.
-    Raises ValueError immediately if the ciphertext, nonce, or tag was altered.
+    Performs hardware-accelerated AES-256-GCM authenticated decryption with tamper detection.
+    Raises ValueError immediately if the ciphertext, nonce, tag, or associated_data was altered.
     """
     if len(key) < 32:
         raise ValueError("Decryption key must be at least 32 bytes (256 bits)")
 
     try:
-        ciphertext = base64.b64decode(ciphertext_b64)
-        nonce = base64.b64decode(nonce_b64)
-        tag = base64.b64decode(tag_b64)
+        ciphertext = base64.b64decode(ciphertext_b64, validate=True)
+        nonce = base64.b64decode(nonce_b64, validate=True)
+        tag = base64.b64decode(tag_b64, validate=True)
     except Exception as e:
         raise ValueError(f"Decryption failed or ciphertext was tampered: invalid base64 encoding ({e})")
 
-    enc_key = key[:16]
-    mac_key = key[16:]
+    if len(nonce) != 12 or len(tag) != 16:
+        raise ValueError("Decryption failed or ciphertext was tampered: invalid nonce or tag length")
 
-    # Authenticate tag first (constant-time verification)
-    aad = associated_data or b""
-    mac_input = aad + nonce + ciphertext
-    expected_tag = hmac.new(mac_key, mac_input, hashlib.sha256).digest()[:16]
-
-    if not hmac.compare_digest(expected_tag, tag):
+    aesgcm = AESGCM(key[:32])
+    try:
+        return aesgcm.decrypt(nonce, ciphertext + tag, associated_data)
+    except InvalidTag:
         raise ValueError("Decryption failed or ciphertext was tampered")
-
-    # Decrypt
-    block_count = (len(ciphertext) + 31) // 32
-    keystream = bytearray()
-    for i in range(block_count):
-        block = hmac.new(enc_key, nonce + i.to_bytes(4, "big"), hashlib.sha256).digest()
-        keystream.extend(block)
-
-    return bytes(c ^ k for c, k in zip(ciphertext, keystream[:len(ciphertext)]))
+    except Exception as e:
+        raise ValueError(f"Decryption failed or ciphertext was tampered ({e})")
 
 
 class WorkspaceSecurityManager:
@@ -143,7 +124,7 @@ class WorkspaceSecurityManager:
         Provisions an isolated workspace directory with 0o700 permissions and encrypted configuration.
         """
         workspace_id = req.workspace_id
-        if not re.match(r"^[a-zA-Z0-9_\-]+$", workspace_id) or ".." in workspace_id:
+        if not re.fullmatch(r"[a-zA-Z0-9_\-]+", workspace_id) or ".." in workspace_id:
             raise ValueError(f"Invalid workspace_id '{workspace_id}' (path traversal rejected)")
 
         workspace_path = self.base_dir / workspace_id

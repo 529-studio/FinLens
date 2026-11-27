@@ -69,12 +69,15 @@ from contracts import (
     DocumentInfoResponse,
     PeerBenchmarkRequest,
     PeerBenchmarkResponse,
+    CashFlowReconcileRequest,
+    CashFlowReconcileResponse,
     is_path_safe,
 )
 from table_stitcher import TableStitcher
 from comparative_query import PortfolioSynthesisEngine
 from ratio_engine import FinancialRatioEngine
 from peer_benchmark import PeerBenchmarkEngine
+from cashflow_reconciler import CashFlowReconciler
 from discrepancy_detector import DiscrepancyDetector
 from audit_packager import AuditPackager
 from workspace_security import WorkspaceSecurityManager
@@ -134,6 +137,7 @@ router = VlmRouter(mlx_engine=mlx_engine, cloud_router=cloud_router)
 portfolio_engine = PortfolioSynthesisEngine(store=retriever.store, retriever=retriever, router=router)
 ratio_engine = FinancialRatioEngine(store=retriever.store, retriever=retriever, router=router)
 peer_benchmark_engine = PeerBenchmarkEngine()
+cashflow_reconciler = CashFlowReconciler()
 discrepancy_detector = DiscrepancyDetector(retriever=retriever)
 audit_packager = AuditPackager(retriever=retriever)
 workspace_manager = WorkspaceSecurityManager()
@@ -972,6 +976,29 @@ def peer_benchmark_endpoint(
         action="PEER_BENCHMARK",
         document_id=req.target_document_id,
         details={"sector": req.sector_name, "weighting_mode": req.weighting_mode.value},
+    )
+    return res
+
+
+@app.post("/api/v1/analysis/cashflow-reconcile", response_model=CashFlowReconcileResponse)
+def cashflow_reconcile_endpoint(
+    req: CashFlowReconcileRequest,
+    user: User = Depends(require_permission(Permission.DOC_READ)),
+):
+    """
+    Reconciles Direct Method Operating Cash Flow (CFO) against Indirect Method derivation
+    with working capital sign handling, materiality classification, and [0, 1000] visual grounding.
+    """
+    try:
+        res = cashflow_reconciler.reconcile(req)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
+    audit_logger.log_event(
+        user_id=user.user_id,
+        role=user.role.value,
+        action="CASHFLOW_RECONCILE",
+        document_id=req.document_id,
+        details={"period": req.period_label, "status": res.status.value, "variance": res.reconciliation_variance},
     )
     return res
 

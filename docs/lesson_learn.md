@@ -423,3 +423,13 @@
     - `Xem tài liệu nguồn`: Gửi tín hiệu qua cầu nối liên ứng dụng (`bridge.sendCitation`) để tự động mở ứng dụng Desktop và nhảy thẳng đến đúng trang và vị trí của con số trên bản PDF gốc.
     - `Gắn ghi chú kiểm toán vào ô Excel`: Tự động nhúng toàn bộ thông tin đối soát, số hiệu thuyết minh và thời gian kiểm toán vào comment của ô trong bảng tính.
   - *Tuân thủ 3 trạng thái giao diện & Zero-Emoji (Rule 15):* Áp dụng Skeleton hiệu ứng pulse shimmer khi nạp dữ liệu, Error state có nút Thử lại, và Empty state khi chưa chọn ô. 100% sử dụng Lucide React SVG (`Tag`, `ExternalLink`, `ShieldCheck`, `BookOpen`, `RefreshCw`, `AlertCircle`, `CheckCircle2`), không sử dụng bất kỳ emoji thô nào.
+
+---
+
+### Bài học 40: Kiểm Tra Chữ Ký Hàm `buildDependencyGraph` & Phân Tách Nhãn Đa Khung Khi Tích Hợp UI (Sprint 13)
+- **Bối cảnh & Thách thức:** Trong Sprint 13 (Task S13-06 & S13-08), khi tích hợp `TabbedSplitViewer` vào `SplitView.component.tsx` và `computeTornadoSensitivity` với `buildDependencyGraph` (`formulaAuditor.ts`), hai lỗi tinh vi đã xuất hiện ở tầng test:
+  1. `buildDependencyGraph` nhận `Record<string, CellInput>` (object có key là địa chỉ ô như `B2`, `B3`), không phải mảng `Array`. Truyền nhầm mảng khiến `Object.entries()` đánh index `'0'`, `'1'` và làm `recalculateModel` trả về `spread = 0`.
+  2. Khi `TabbedSplitViewer` tự động bật ở chế độ `comparative`, việc hiển thị nguyên văn `VNM_2022_COMP` ở cả tab bar và `PaneToolbar` làm `screen.getByText('VNM_2022_COMP')` trong `ComparativeQuery.test.tsx` lỗi `Found multiple elements`.
+- **Giải pháp chuẩn hóa:**
+  - Luôn kiểm tra chữ ký kiểu dữ liệu (`Record<string, ...>`) của `buildDependencyGraph` trước khi dựng graph mẫu trong component hoặc test.
+  - Phân biệt nhãn hiển thị ở các khung phụ (`PDF · ${id}`, `Tài liệu: ${id}`) để giữ ngữ nghĩa rõ ràng cho người dùng và tránh đụng exact-text selector trong Vitest.

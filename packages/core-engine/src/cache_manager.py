@@ -10,31 +10,90 @@ Provides:
 
 import os
 import re
+import json
+import time
 import shutil
+import sqlite3
 import logging
 import threading
 from pathlib import Path
 from collections import OrderedDict
-from typing import Dict, Any, Optional, List, Tuple
+from typing import Dict, Any, Optional, List, Tuple, Union
 
 from contracts import is_path_safe
 
 logger = logging.getLogger("finsight.cache")
 
+DEFAULT_CACHE_DB_PATH = Path(os.getenv("FINTRACE_CACHE_DB_PATH", "~/.finsight/cache/query_cache.db")).expanduser().resolve()
+
+
+def _json_default(obj: Any) -> Any:
+    if hasattr(obj, "model_dump"):
+        return obj.model_dump()
+    raise TypeError(f"Object of type {type(obj).__name__} is not JSON serializable")
+
 
 class QueryLRUCache:
     """
     Thread-safe Least Recently Used (LRU) cache for financial query responses.
-    Reduces repeat query latency from ~1000ms+ to < 5ms.
+    Supports process-local OrderedDict mode and multi-worker SQLite WAL shared mode.
     """
 
-    def __init__(self, max_capacity: int = 256):
+    def __init__(
+        self,
+        max_capacity: int = 256,
+        shared_backend: Optional[str] = None,
+        db_path: Optional[Union[str, Path]] = None,
+    ):
         self.max_capacity = max_capacity
+        self.shared_backend = (
+            shared_backend
+            or ("sqlite" if db_path is not None else os.getenv("FINTRACE_SHARED_BACKEND", "memory"))
+        ).strip().lower()
+        self.db_path = Path(db_path).expanduser().resolve() if db_path is not None else DEFAULT_CACHE_DB_PATH
         self._cache: OrderedDict[str, Dict[str, Any]] = OrderedDict()
         self._doc_to_keys: Dict[str, set[str]] = {}
         self._lock = threading.RLock()
         self.hits: int = 0
         self.misses: int = 0
+
+        if self.shared_backend == "sqlite":
+            if not is_path_safe(str(self.db_path)):
+                raise ValueError(f"Access denied: cache db_path '{self.db_path}' escapes authorized boundaries")
+            self.db_path.parent.mkdir(parents=True, exist_ok=True)
+            self._init_sqlite()
+
+    def _connect_sqlite(self) -> sqlite3.Connection:
+        conn = sqlite3.connect(str(self.db_path), timeout=10.0, isolation_level=None)
+        conn.execute("PRAGMA journal_mode=WAL;")
+        conn.execute("PRAGMA synchronous=NORMAL;")
+        conn.execute("PRAGMA busy_timeout=5000;")
+        return conn
+
+    def _init_sqlite(self) -> None:
+        with self._connect_sqlite() as conn:
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS query_cache (
+                    cache_key TEXT PRIMARY KEY,
+                    doc_id TEXT NOT NULL,
+                    response_json TEXT NOT NULL,
+                    last_access REAL NOT NULL
+                );
+                """
+            )
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_qcache_doc ON query_cache(doc_id);")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_qcache_lru ON query_cache(last_access);")
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS cache_metrics (
+                    id INTEGER PRIMARY KEY CHECK (id = 1),
+                    hits INTEGER NOT NULL DEFAULT 0,
+                    misses INTEGER NOT NULL DEFAULT 0
+                );
+                """
+            )
+            conn.execute("INSERT OR IGNORE INTO cache_metrics (id, hits, misses) VALUES (1, 0, 0);")
 
     def _make_key(self, doc_id: str, query_text: str, top_k: int, mode: str) -> str:
         norm_query = query_text.strip().lower()
@@ -43,6 +102,34 @@ class QueryLRUCache:
     def get(self, doc_id: str, query_text: str, top_k: int, mode: str) -> Optional[Dict[str, Any]]:
         key = self._make_key(doc_id, query_text, top_k, mode)
         with self._lock:
+            if self.shared_backend == "sqlite":
+                now = time.monotonic()
+                conn = self._connect_sqlite()
+                try:
+                    conn.execute("BEGIN IMMEDIATE;")
+                    row = conn.execute(
+                        "SELECT response_json FROM query_cache WHERE cache_key = ?",
+                        (key,),
+                    ).fetchone()
+                    if row is not None:
+                        conn.execute(
+                            "UPDATE query_cache SET last_access = ? WHERE cache_key = ?",
+                            (now, key),
+                        )
+                        conn.execute("UPDATE cache_metrics SET hits = hits + 1 WHERE id = 1")
+                        conn.execute("COMMIT;")
+                        self.hits += 1
+                        return json.loads(row[0])
+                    conn.execute("UPDATE cache_metrics SET misses = misses + 1 WHERE id = 1")
+                    conn.execute("COMMIT;")
+                    self.misses += 1
+                    return None
+                except Exception:
+                    conn.execute("ROLLBACK;")
+                    raise
+                finally:
+                    conn.close()
+
             if key in self._cache:
                 self._cache.move_to_end(key)
                 self.hits += 1
@@ -54,6 +141,41 @@ class QueryLRUCache:
     def put(self, doc_id: str, query_text: str, top_k: int, mode: str, response_data: Dict[str, Any]) -> None:
         key = self._make_key(doc_id, query_text, top_k, mode)
         with self._lock:
+            if self.shared_backend == "sqlite":
+                now = time.monotonic()
+                payload_json = json.dumps(response_data, ensure_ascii=False, default=_json_default)
+                conn = self._connect_sqlite()
+                try:
+                    conn.execute("BEGIN IMMEDIATE;")
+                    conn.execute(
+                        """
+                        INSERT INTO query_cache (cache_key, doc_id, response_json, last_access)
+                        VALUES (?, ?, ?, ?)
+                        ON CONFLICT(cache_key) DO UPDATE SET
+                            response_json = excluded.response_json,
+                            last_access = excluded.last_access
+                        """,
+                        (key, doc_id, payload_json, now),
+                    )
+                    total = int(conn.execute("SELECT COUNT(*) FROM query_cache").fetchone()[0])
+                    if total > self.max_capacity:
+                        excess = total - self.max_capacity
+                        conn.execute(
+                            """
+                            DELETE FROM query_cache WHERE cache_key IN (
+                                SELECT cache_key FROM query_cache ORDER BY last_access ASC LIMIT ?
+                            )
+                            """,
+                            (excess,),
+                        )
+                    conn.execute("COMMIT;")
+                    return
+                except Exception:
+                    conn.execute("ROLLBACK;")
+                    raise
+                finally:
+                    conn.close()
+
             if key in self._cache:
                 self._cache.move_to_end(key)
             self._cache[key] = response_data
@@ -74,6 +196,20 @@ class QueryLRUCache:
     def invalidate_document(self, doc_id: str) -> int:
         """Invalidates all cached queries for a specific document."""
         with self._lock:
+            if self.shared_backend == "sqlite":
+                conn = self._connect_sqlite()
+                try:
+                    conn.execute("BEGIN IMMEDIATE;")
+                    cur = conn.execute("DELETE FROM query_cache WHERE doc_id = ?", (doc_id,))
+                    removed = int(cur.rowcount or 0)
+                    conn.execute("COMMIT;")
+                    return removed
+                except Exception:
+                    conn.execute("ROLLBACK;")
+                    raise
+                finally:
+                    conn.close()
+
             keys = self._doc_to_keys.pop(doc_id, set())
             removed = 0
             for k in keys:
@@ -84,6 +220,18 @@ class QueryLRUCache:
 
     def clear(self) -> None:
         with self._lock:
+            if self.shared_backend == "sqlite":
+                conn = self._connect_sqlite()
+                try:
+                    conn.execute("BEGIN IMMEDIATE;")
+                    conn.execute("DELETE FROM query_cache")
+                    conn.execute("UPDATE cache_metrics SET hits = 0, misses = 0 WHERE id = 1")
+                    conn.execute("COMMIT;")
+                except Exception:
+                    conn.execute("ROLLBACK;")
+                    raise
+                finally:
+                    conn.close()
             self._cache.clear()
             self._doc_to_keys.clear()
             self.hits = 0
@@ -91,6 +239,22 @@ class QueryLRUCache:
 
     def stats(self) -> Dict[str, Any]:
         with self._lock:
+            if self.shared_backend == "sqlite":
+                with self._connect_sqlite() as conn:
+                    entries = int(conn.execute("SELECT COUNT(*) FROM query_cache").fetchone()[0])
+                    row = conn.execute("SELECT hits, misses FROM cache_metrics WHERE id = 1").fetchone()
+                    hits = int(row[0]) if row else 0
+                    misses = int(row[1]) if row else 0
+                total_lookups = hits + misses
+                ratio = (hits / total_lookups) if total_lookups > 0 else 0.0
+                return {
+                    "in_memory_query_cache_entries": entries,
+                    "query_cache_hits": hits,
+                    "query_cache_misses": misses,
+                    "hit_ratio": round(ratio, 4),
+                    "backend": "sqlite_wal",
+                }
+
             total_lookups = self.hits + self.misses
             ratio = (self.hits / total_lookups) if total_lookups > 0 else 0.0
             return {
@@ -106,9 +270,19 @@ class CacheManager:
     Coordinates application-wide caching: in-memory query cache and rendered page disk cache.
     """
 
-    def __init__(self, render_cache_dir: str = "~/.finsight/cache/rendered_pages", query_cache_size: int = 256):
+    def __init__(
+        self,
+        render_cache_dir: str = "~/.finsight/cache/rendered_pages",
+        query_cache_size: int = 256,
+        shared_backend: Optional[str] = None,
+        cache_db_path: Optional[Union[str, Path]] = None,
+    ):
         self.render_cache_dir = Path(os.path.expanduser(render_cache_dir)).resolve()
-        self.query_cache = QueryLRUCache(max_capacity=query_cache_size)
+        self.query_cache = QueryLRUCache(
+            max_capacity=query_cache_size,
+            shared_backend=shared_backend,
+            db_path=cache_db_path,
+        )
 
     def get_stats(self) -> Dict[str, Any]:
         """Calculates global cache statistics across memory and disk."""

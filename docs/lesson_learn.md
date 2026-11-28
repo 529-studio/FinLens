@@ -433,3 +433,13 @@
 - **Giải pháp chuẩn hóa:**
   - Luôn kiểm tra chữ ký kiểu dữ liệu (`Record<string, ...>`) của `buildDependencyGraph` trước khi dựng graph mẫu trong component hoặc test.
   - Phân biệt nhãn hiển thị ở các khung phụ (`PDF · ${id}`, `Tài liệu: ${id}`) để giữ ngữ nghĩa rõ ràng cho người dùng và tránh đụng exact-text selector trong Vitest.
+
+---
+
+### Bài học 41: Tránh Race Condition Khởi Tạo SQLite WAL & Giảm Độ Trễ Warm-Cache Trên CI `ubuntu-latest` (Sprint 14)
+- **Bối cảnh & Thách thức:** Trong Sprint 14 (Task S14-01 & S14-04), khi chạy trên runner `ubuntu-latest` của GitHub Actions, hai lỗi không xuất hiện trên macOS Apple Silicon đã xảy ra:
+  1. Khi 2 tiến trình con (`multiprocessing` `spawn`) mở cùng một file SQLite chưa tồn tại và đồng thời gọi `PRAGMA journal_mode=WAL;`, SQLite yêu cầu exclusive schema lock để chuyển mode từ `DELETE` sang `WAL`, dẫn đến `sqlite3.OperationalError: database is locked`.
+  2. Việc gọi lại `store.search()` + `store.search_patches()` trên đĩa LanceDB ở mỗi query cho tài liệu nhỏ (`<= 100` trang) hoặc re-embed toàn bộ trang khi re-ingest tài liệu đã cache làm độ trễ trên đĩa CI chậm vượt ngưỡng `10.0 ms` (`test_benchmark_regression.py`) và `100.0 ms` (`test_performance_and_cache.py`).
+- **Giải pháp chuẩn hóa:**
+  - Chỉ thực thi `PRAGMA journal_mode=WAL;` một lần trong `_init_sqlite()` kèm retry có backoff giới hạn (5 lần) khi gặp `OperationalError` chứa `"locked"`, và pre-initialize schema trước khi spawn multi-worker processes.
+  - Gắn `LanceDBStore._cache_epoch` vào cache ma trận numpy trong `VisualRetriever` để bỏ qua ANN scan đĩa khi cache đang warm & đúng epoch cho tài liệu `<= 100` trang, đồng thời kiểm tra khớp `(page_number, signature)` trong `index_document()` để bỏ qua ghi thừa khi re-ingest.

@@ -443,6 +443,22 @@ class VisualRetriever:
                     f"Access denied: image_path '{img_path}' escapes authorized boundaries"
                 )
 
+        # Fast idempotent skip: if exact same page signatures are already indexed, avoid redundant LanceDB writes
+        if pages:
+            existing_pages = self.store.get_pages(clean_id)
+            if len(existing_pages) == len(pages):
+                incoming_sigs = []
+                for page_num, img_path, _, _ in pages:
+                    p_path = Path(img_path)
+                    try:
+                        sig = hashlib.sha256(p_path.read_bytes()).hexdigest()[:16]
+                    except OSError:
+                        sig = hashlib.sha256(f"{p_path}:{page_num}".encode("utf-8")).hexdigest()[:16]
+                    incoming_sigs.append((page_num, sig))
+                existing_sigs = [(p["page_number"], p["signature"]) for p in existing_pages]
+                if incoming_sigs == existing_sigs and self.store.get_page_patches(clean_id):
+                    return len(existing_pages)
+
         embeddings = self.embedder.embed_document_pages(pages)
         indexed_pages: List[Dict[str, Any]] = []
         patch_rows: List[Dict[str, Any]] = []

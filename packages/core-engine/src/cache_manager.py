@@ -64,36 +64,44 @@ class QueryLRUCache:
             self._init_sqlite()
 
     def _connect_sqlite(self) -> sqlite3.Connection:
-        conn = sqlite3.connect(str(self.db_path), timeout=10.0, isolation_level=None)
-        conn.execute("PRAGMA journal_mode=WAL;")
-        conn.execute("PRAGMA synchronous=NORMAL;")
-        conn.execute("PRAGMA busy_timeout=5000;")
+        conn = sqlite3.connect(str(self.db_path), timeout=30.0, isolation_level=None)
+        conn.execute("PRAGMA busy_timeout=10000;")
         return conn
 
     def _init_sqlite(self) -> None:
-        with self._connect_sqlite() as conn:
-            conn.execute(
-                """
-                CREATE TABLE IF NOT EXISTS query_cache (
-                    cache_key TEXT PRIMARY KEY,
-                    doc_id TEXT NOT NULL,
-                    response_json TEXT NOT NULL,
-                    last_access REAL NOT NULL
-                );
-                """
-            )
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_qcache_doc ON query_cache(doc_id);")
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_qcache_lru ON query_cache(last_access);")
-            conn.execute(
-                """
-                CREATE TABLE IF NOT EXISTS cache_metrics (
-                    id INTEGER PRIMARY KEY CHECK (id = 1),
-                    hits INTEGER NOT NULL DEFAULT 0,
-                    misses INTEGER NOT NULL DEFAULT 0
-                );
-                """
-            )
-            conn.execute("INSERT OR IGNORE INTO cache_metrics (id, hits, misses) VALUES (1, 0, 0);")
+        for attempt in range(5):
+            try:
+                with self._connect_sqlite() as conn:
+                    conn.execute("PRAGMA journal_mode=WAL;")
+                    conn.execute("PRAGMA synchronous=NORMAL;")
+                    conn.execute(
+                        """
+                        CREATE TABLE IF NOT EXISTS query_cache (
+                            cache_key TEXT PRIMARY KEY,
+                            doc_id TEXT NOT NULL,
+                            response_json TEXT NOT NULL,
+                            last_access REAL NOT NULL
+                        );
+                        """
+                    )
+                    conn.execute("CREATE INDEX IF NOT EXISTS idx_qcache_doc ON query_cache(doc_id);")
+                    conn.execute("CREATE INDEX IF NOT EXISTS idx_qcache_lru ON query_cache(last_access);")
+                    conn.execute(
+                        """
+                        CREATE TABLE IF NOT EXISTS cache_metrics (
+                            id INTEGER PRIMARY KEY CHECK (id = 1),
+                            hits INTEGER NOT NULL DEFAULT 0,
+                            misses INTEGER NOT NULL DEFAULT 0
+                        );
+                        """
+                    )
+                    conn.execute("INSERT OR IGNORE INTO cache_metrics (id, hits, misses) VALUES (1, 0, 0);")
+                return
+            except sqlite3.OperationalError as e:
+                if "locked" in str(e).lower() and attempt < 4:
+                    time.sleep(0.05 * (attempt + 1))
+                    continue
+                raise
 
     def _make_key(self, doc_id: str, query_text: str, top_k: int, mode: str) -> str:
         norm_query = query_text.strip().lower()

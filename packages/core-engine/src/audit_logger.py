@@ -84,31 +84,39 @@ class AuditLogger:
         self._initialize_chain_head()
 
     def _connect_sqlite(self) -> sqlite3.Connection:
-        conn = sqlite3.connect(str(self.db_file), timeout=10.0, isolation_level=None)
-        conn.execute("PRAGMA journal_mode=WAL;")
-        conn.execute("PRAGMA synchronous=NORMAL;")
-        conn.execute("PRAGMA busy_timeout=5000;")
+        conn = sqlite3.connect(str(self.db_file), timeout=30.0, isolation_level=None)
+        conn.execute("PRAGMA busy_timeout=10000;")
         return conn
 
     def _init_sqlite(self) -> None:
-        with self._connect_sqlite() as conn:
-            conn.execute(
-                """
-                CREATE TABLE IF NOT EXISTS audit_events (
-                    sequence_id INTEGER PRIMARY KEY,
-                    timestamp TEXT NOT NULL,
-                    user_id TEXT NOT NULL,
-                    role TEXT NOT NULL,
-                    action TEXT NOT NULL,
-                    document_id TEXT,
-                    details_json TEXT NOT NULL,
-                    prev_hash TEXT NOT NULL,
-                    record_hash TEXT NOT NULL
-                );
-                """
-            )
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_audit_action ON audit_events(action);")
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_audit_doc ON audit_events(document_id);")
+        for attempt in range(5):
+            try:
+                with self._connect_sqlite() as conn:
+                    conn.execute("PRAGMA journal_mode=WAL;")
+                    conn.execute("PRAGMA synchronous=NORMAL;")
+                    conn.execute(
+                        """
+                        CREATE TABLE IF NOT EXISTS audit_events (
+                            sequence_id INTEGER PRIMARY KEY,
+                            timestamp TEXT NOT NULL,
+                            user_id TEXT NOT NULL,
+                            role TEXT NOT NULL,
+                            action TEXT NOT NULL,
+                            document_id TEXT,
+                            details_json TEXT NOT NULL,
+                            prev_hash TEXT NOT NULL,
+                            record_hash TEXT NOT NULL
+                        );
+                        """
+                    )
+                    conn.execute("CREATE INDEX IF NOT EXISTS idx_audit_action ON audit_events(action);")
+                    conn.execute("CREATE INDEX IF NOT EXISTS idx_audit_doc ON audit_events(document_id);")
+                return
+            except sqlite3.OperationalError as e:
+                if "locked" in str(e).lower() and attempt < 4:
+                    time.sleep(0.05 * (attempt + 1))
+                    continue
+                raise
 
     def _read_jsonl_tail(self) -> Tuple[int, str]:
         if not self.log_file.exists() or self.log_file.stat().st_size == 0:

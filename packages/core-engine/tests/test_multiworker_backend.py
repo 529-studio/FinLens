@@ -86,6 +86,8 @@ def test_query_lru_cache_shared_across_workers_and_processes(tmp_path):
     and document invalidations across separate worker instances and OS processes.
     """
     db_path = tmp_path / "shared_cache.db"
+    # Pre-initialize WAL schema before spawning concurrent worker processes
+    QueryLRUCache(max_capacity=2, shared_backend="sqlite", db_path=db_path)
     ctx = multiprocessing.get_context("spawn")
 
     # Worker process 1 populates cache

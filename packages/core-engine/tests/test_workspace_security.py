@@ -249,3 +249,41 @@ def test_api_workspace_unauthorized():
         headers=headers,
     )
     assert res.status_code == 401
+
+
+def test_aesgcm_cryptography_interoperability_and_aad_tamper_guards():
+    """Verify real NIST SP 800-38D AESGCM interoperability and strict tamper/AAD/length guards."""
+    import base64
+    from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+
+    key = derive_tenant_key("hw_aesgcm_seed", b"salt_aesgcm_test")
+    plaintext = b'{"doc_id":"FED_FSR_2025_11","total_pages":75,"status":"audited"}'
+    aad = b"tenant_fed_audit"
+
+    bundle = encrypt_data_at_rest(plaintext, key, associated_data=aad)
+    raw_ct = base64.b64decode(bundle["ciphertext"])
+    raw_nonce = base64.b64decode(bundle["nonce"])
+    raw_tag = base64.b64decode(bundle["tag"])
+    assert len(raw_nonce) == 12
+    assert len(raw_tag) == 16
+
+    # Decrypt directly with cryptography's AESGCM to prove real standard compliance
+    assert AESGCM(key).decrypt(raw_nonce, raw_ct + raw_tag, aad) == plaintext
+
+    # Wrong AAD must fail
+    with pytest.raises(ValueError, match="Decryption failed or ciphertext was tampered"):
+        decrypt_data_at_rest(bundle["ciphertext"], bundle["nonce"], bundle["tag"], key, associated_data=b"wrong_aad")
+
+    # Tampered tag must fail
+    bad_tag = base64.b64encode(bytes([raw_tag[0] ^ 0xFF]) + raw_tag[1:]).decode("utf-8")
+    with pytest.raises(ValueError, match="Decryption failed or ciphertext was tampered"):
+        decrypt_data_at_rest(bundle["ciphertext"], bundle["nonce"], bad_tag, key, associated_data=aad)
+
+    # Invalid nonce length must fail
+    short_nonce = base64.b64encode(b"short").decode("utf-8")
+    with pytest.raises(ValueError, match="invalid nonce or tag length"):
+        decrypt_data_at_rest(bundle["ciphertext"], short_nonce, bundle["tag"], key, associated_data=aad)
+
+    # Short key must fail
+    with pytest.raises(ValueError, match="at least 32 bytes"):
+        encrypt_data_at_rest(plaintext, b"too_short_key")
